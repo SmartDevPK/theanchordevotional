@@ -2,6 +2,9 @@
 include "admin_dashboards.php";
 ?>
 
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1052,14 +1055,14 @@ include "admin_dashboards.php";
                             <i class="fas fa-book-open"></i>
                         </div>
                         <div class="stat-number" id="total-devotions">  <?php echo $total; ?></div>
-                        <div class="stat-label">Total Devotion</div>
+                        <div class="stat-label">Landing page</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon primary">
                             <i class="fas fa-book-open"></i>
                         </div>
                         <div class="stat-number" id="total-devotions">  <?php echo $approved_total; ?></div>
-                        <div class="stat-label">Total Devotions</div>
+                        <div class="stat-label">Today Devotional</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon primary">
@@ -1122,7 +1125,7 @@ include "admin_dashboards.php";
                         <i class="fas fa-home"></i>
                         Landing Page Content
                     </h4>
-                    <form id="homepage-form">
+                    <form id="homepage-form" action="save_homepage.php" method="POST" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
@@ -1145,7 +1148,7 @@ include "admin_dashboards.php";
 
                         <div class="form-group">
                             <label for="cover-image">Cover Image</label>
-                            <input type="file" class="form-control" id="cover-image" accept="image/*">
+                            <input type="file" class="form-control" name="cover_image" id="cover-image" accept="image/*">
                             <img id="cover-preview" class="image-preview" style="display:none;">
                         </div>
 
@@ -1153,30 +1156,30 @@ include "admin_dashboards.php";
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="featured-topic">Featured Topic</label>
-                                    <input type="text" class="form-control" id="featured-topic" placeholder="Surviving the HEAT" required>
+                                    <input type="text" class="form-control" name="featured_topic" id="featured-topic" placeholder="Surviving the HEAT" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="featured-date">Publication Date</label>
-                                    <input type="date" class="form-control" id="featured-date" required>
+                                    <input type="date" class="form-control" name="featured_date" id="featured-date" required>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="featured-intro">Featured Devotion Intro</label>
-                            <textarea class="form-control" id="featured-intro" rows="4" placeholder="Brief introduction to today's devotion..." required></textarea>
+                            <textarea class="form-control" id="featured_intro" name="featured_intro" rows="4" placeholder="Brief introduction to today's devotion..." required></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="verse-of-day">Verse of the Day</label>
-                            <textarea class="form-control" id="verse-of-day" rows="3" placeholder="Enter today's featured Bible verse..." required></textarea>
+                            <textarea class="form-control" id="verse-of-day" name="verse_of_day" rows="3" placeholder="Enter today's featured Bible verse..." required></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="verse-reference">Verse Reference</label>
-                            <input type="text" class="form-control" id="verse-reference" placeholder="John 3:16 (NIV)" required>
+                            <input type="text" class="form-control" name="verse_reference" id="verse-reference" placeholder="John 3:16 (NIV)" required>
                         </div>
 
                         <div class="form-actions">
@@ -2122,6 +2125,8 @@ include "admin_dashboards.php";
                 }
             });
         });
+
+        
     </script>
 </body>
 </html>

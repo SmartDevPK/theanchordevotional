@@ -2,7 +2,7 @@
 include("db.php"); 
 
 // Total devotions 
-$sql = "SELECT COUNT(*) AS total_devotions FROM devotion";
+$sql = "SELECT COUNT(*) AS total_devotions FROM landing_page_content";
 $result = $mysqli->query($sql);
 
 if ($result) {
