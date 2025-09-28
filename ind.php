@@ -1175,7 +1175,7 @@ if (isset($_GET['error'])) {
                 <button type="submit" class="subscribe-btn">Subscribe</button>
             </form>
         </div>
-    </section>>
+    </section>
 
     <!-- Footer -->
     <footer>

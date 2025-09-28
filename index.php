@@ -1368,37 +1368,38 @@ if (isset($_GET['error'])) {
 
 
     <!-- Daily Verse Section -->
-    <section class="section daily-verse" id="daily-verse">
-        <div class="container">
-            <div class="daily-verse-content">
-                <div class="verse-card">
-                    <div class="verse-header">
-                        <h3>Verse of the Day</h3>
-                        <span class="verse-date" id="verse-date"></span>
-                    </div>
-                    <div class="verse-text">
-                        <p id="daily-verse-text">"And we know that in all things God works for the good of those who love him, who have been called according to his purpose."</p>
-                        <cite id="verse-reference">Romans 8:28 (NIV)</cite>
-                    </div>
-                    <div class="verse-actions">
-                        <button class="btn-share-verse" onclick="shareVerse()">
-                            <i class="fas fa-share-alt"></i> Share Verse
-                        </button>
-                        <button class="btn-copy-verse" onclick="copyVerse()">
-                            <i class="fas fa-copy"></i> Copy
-                        </button>
-                    </div>
+ <section class="section daily-verse" id="daily-verse">
+    <div class="container">
+        <div class="daily-verse-content">
+            <div class="verse-card">
+                <div class="verse-header">
+                    <h3>Verse of the Day</h3>
+                    <span class="verse-date" id="verse-date"><?php echo $today; ?></span>
+                </div>
+                <div class="verse-text">
+                    <p id="daily-verse-text"><?php echo htmlspecialchars($verseText); ?></p>
+                    <cite id="verse-reference"><?php echo htmlspecialchars($verseRef); ?></cite>
+                </div>
+                <div class="verse-actions">
+                    <button class="btn-share-verse" onclick="shareVerse()">
+                        <i class="fas fa-share-alt"></i> Share Verse
+                    </button>
+                    <button class="btn-copy-verse" onclick="copyVerse()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
+
 
     <!-- Prayer Request Section -->
-   <section class="section prayer" id="prayer">
+    <section class="section prayer" id="prayer">
         <div class="container">
             <h2 class="section-title" data-aos="fade-up">Prayer Requests</h2>
             <div class="prayer-form" data-aos="fade-up" data-aos-delay="100">
-                <form id="prayerRequestForm" action="submit_prayer.php" method="POST">
+                <form id="prayerRequestForm" action="submit.php" method="POST">
                     <div class="form-group">
                         <label for="name">Your Name</label>
                         <input type="text" name="name" id="name" class="form-control" required>
@@ -1423,15 +1424,17 @@ if (isset($_GET['error'])) {
         </div>
     </section>
 
-    <!-- Subscribe Section -->
+     <!-- Subscribe Section -->
     <section class="section subscribe" id="subscribe">
         <div class="container">
-            <h2 class="section-title" style="color: white;">Stay Connected</h2>
-            <p style="text-align: center; margin-bottom: 30px; max-width: 700px; margin-left: auto; margin-right: auto;">
-                Receive daily devotionals directly in your inbox. Join our community of believers growing together in faith.
+            <h2 class="section-title" style="color: white;" data-aos="fade-up">Stay Connected</h2>
+            <p style="text-align: center; margin-bottom: 30px; max-width: 700px; margin-left: auto; margin-right: auto;"
+                data-aos="fade-up">
+                Receive daily devotionals directly in your inbox. Join our community of believers growing together in
+                faith.
             </p>
-            <form class="subscribe-form" id="subscribeForm">
-                <input type="email" class="subscribe-input" placeholder="Your email address" required>
+            <form class="subscribe-form" id="subscribeForm" data-aos="fade-up" data-aos-delay="100">
+                <input type="email" name="email" class="subscribe-input" placeholder="Your email address" required>
                 <button type="submit" class="subscribe-btn">Subscribe</button>
             </form>
         </div>
@@ -1491,113 +1494,119 @@ if (isset($_GET['error'])) {
     </footer>
 
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>
-        // Initialize AOS animations
-        AOS.init({
-            duration: 800,
-            easing: 'ease-in-out',
-            once: true
+   <script>
+/* ------------------------------
+   AOS Animation Init
+--------------------------------*/
+AOS.init({
+    duration: 800,
+    easing: 'ease-in-out',
+    once: true
+});
+
+/* ------------------------------
+   Mobile Menu Toggle
+--------------------------------*/
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileMenu = document.getElementById('mobileMenu');
+
+if (mobileMenuBtn && mobileMenu) {
+    mobileMenuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('active');
+        mobileMenuBtn.innerHTML = mobileMenu.classList.contains('active')
+            ? '<i class="fas fa-times"></i>'
+            : '<i class="fas fa-bars"></i>';
+    });
+}
+
+/* ------------------------------
+   Header Scroll Effect
+--------------------------------*/
+window.addEventListener('scroll', () => {
+    const header = document.getElementById('header');
+    if (!header) return;
+    if (window.scrollY > 100) {
+        header.classList.add('header-scrolled');
+    } else {
+        header.classList.remove('header-scrolled');
+    }
+});
+
+/* ------------------------------
+   Prayer Request Form Submission
+--------------------------------*/
+document.getElementById('prayerRequestForm')?.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch('submit.php', {
+        method: 'POST',
+        body: formData
+    })
+        .then(res => res.text())
+        .then(data => {
+            console.log('Server response:', data);
+            alert(data); // show server message directly
+            this.reset();
+        })
+        .catch(error => {
+            console.error('Submission error:', error);
+            alert('There was a problem submitting your request. Please try again.');
         });
+});
 
-        // Google Analytics (replace with your tracking ID)
-        // gtag('config', 'GA_TRACKING_ID');
+/* ------------------------------
+   Subscribe Form Submission
+--------------------------------*/
+document.getElementById('subscribeForm')?.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const emailInput = document.querySelector('.subscribe-input');
+            const email = emailInput.value.trim();
 
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const mobileMenu = document.getElementById('mobileMenu');
-        
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('active');
-            mobileMenuBtn.innerHTML = mobileMenu.classList.contains('active') ? 
-                '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
-        });
-
-        // Header scroll effect
-        window.addEventListener('scroll', () => {
-            const header = document.getElementById('header');
-            if (window.scrollY > 100) {
-                header.classList.add('header-scrolled');
-            } else {
-                header.classList.remove('header-scrolled');
+            if (!email) {
+                alert('Please enter your email.');
+                return;
             }
+
+            fetch('subscribe.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'email=' + encodeURIComponent(email)
+            })
+                .then(res => res.text())
+                .then(data => {
+                    alert(data);
+                    emailInput.value = '';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('There was an error. Please try again.');
+                });
         });
 
-        // Form submissions
-        document.getElementById('prayerRequestForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Get form data
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const request = document.getElementById('request').value;
-            const sharePublicly = document.getElementById('sharePublicly').checked;
-            
-            // Create prayer request object
-            const prayerRequest = {
-                id: Date.now(),
-                name: name,
-                email: email,
-                request: request,
-                sharePublicly: sharePublicly,
-                timestamp: new Date().toISOString(),
-                status: 'submitted'
-            };
-            
-            // Store in localStorage (in production, this would be sent to backend)
-            let prayerRequests = JSON.parse(localStorage.getItem('prayerRequests') || '[]');
-            prayerRequests.push(prayerRequest);
-            localStorage.setItem('prayerRequests', JSON.stringify(prayerRequests));
-            
-            // Show success message
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Submitted! Thank you';
-            submitBtn.disabled = true;
-            submitBtn.style.backgroundColor = '#28a745';
-            
-            setTimeout(() => {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-                submitBtn.style.backgroundColor = '';
-            }, 3000);
-            
-            // Show detailed success message
-            alert(`Thank you, ${name}! Your prayer request has been received. Our prayer team will lift up your request to God. You will be in our prayers.`);
-            this.reset();
-        });
 
-        document.getElementById('subscribeForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Thank you for subscribing to The Anchor Devotional!');
-            this.reset();
-        });
-        // Function to fetch devotionals
+/* ------------------------------
+   Fetch & Display Devotionals
+--------------------------------*/
 async function fetchDevotionals(limit = null, filter = {}) {
     let url = 'api/index.php/devotionals';
-    // Add query parameters for filtering if needed
-    // Example: url += '?month=' + filter.month + '&year=' + filter.year;
-    // Example: If limit is specified: url += '?limit=' + limit;
+    // add query params if needed here
 
     try {
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const devotionals = await response.json();
-        return devotionals;
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
     } catch (error) {
         console.error('Error fetching devotionals:', error);
-        // Display an error message to the user
         return [];
     }
 }
 
-// Function to display devotionals on the page
 function displayDevotionals(devotionals) {
-    const devotionGrid = document.querySelector('.devotions-grid'); // Or wherever your cards are displayed
+    const devotionGrid = document.querySelector('.devotions-grid');
     if (!devotionGrid) return;
 
-    devotionGrid.innerHTML = ''; // Clear existing content
+    devotionGrid.innerHTML = '';
 
     if (devotionals.length === 0) {
         devotionGrid.innerHTML = '<p>No devotionals found. Please check back later or adjust your filters.</p>';
@@ -1622,72 +1631,72 @@ function displayDevotionals(devotionals) {
     });
 }
 
-// --- Example Usage ---
 document.addEventListener('DOMContentLoaded', async () => {
     const devotionals = await fetchDevotionals();
     displayDevotionals(devotionals);
 
-    // Add event listener for filters if you have them
-    document.querySelector('.filter-form').addEventListener('submit', async (e) => {
+    document.querySelector('.filter-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const month = document.getElementById('month').value;
         const year = document.getElementById('year').value;
-        // Fetch filtered devotionals (implement filtering logic in backend)
-        // const filteredDevotionals = await fetchDevotionals(null, { month, year });
-        // displayDevotionals(filteredDevotionals);
+        // const filtered = await fetchDevotionals(null, { month, year });
+        // displayDevotionals(filtered);
         alert('Filtering not fully implemented in this example.');
     });
 });
 
-        // Daily Verse Functions
-        function shareVerse() {
-            const verseText = document.getElementById('daily-verse-text').textContent;
-            const verseRef = document.getElementById('verse-reference').textContent;
-            const shareText = `${verseText} - ${verseRef}`;
-            
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Daily Verse - The Anchor Devotional',
-                    text: shareText,
-                    url: window.location.href
-                });
-            } else {
-                // Fallback for browsers that don't support native sharing
-                const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.href)}`;
-                window.open(url, '_blank');
-            }
-        }
-        
-        function copyVerse() {
-            const verseText = document.getElementById('daily-verse-text').textContent;
-            const verseRef = document.getElementById('verse-reference').textContent;
-            const fullVerse = `${verseText} - ${verseRef}`;
-            
-            navigator.clipboard.writeText(fullVerse).then(() => {
-                // Show temporary success message
-                const copyBtn = document.querySelector('.btn-copy-verse');
-                const originalText = copyBtn.innerHTML;
-                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                setTimeout(() => {
-                    copyBtn.innerHTML = originalText;
-                }, 2000);
-            });
-        }
-        
-        // Update verse date
-        function updateVerseDate() {
-            const today = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            };
-            document.getElementById('verse-date').textContent = today.toLocaleDateString('en-US', options);
-        }
-        
-        // Call update function on page load
-        updateVerseDate();
-    </script>
+/* ------------------------------
+   Daily Verse Share / Copy
+--------------------------------*/
+function shareVerse() {
+    const verseText = document.getElementById('daily-verse-text')?.textContent || '';
+    const verseRef = document.getElementById('verse-reference')?.textContent || '';
+    const shareText = `${verseText} - ${verseRef}`;
+
+    if (navigator.share) {
+        navigator.share({
+            title: 'Daily Verse - The Anchor Devotional',
+            text: shareText,
+            url: window.location.href
+        });
+    } else {
+        const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(window.location.href)}`;
+        window.open(url, '_blank');
+    }
+}
+
+function copyVerse() {
+    const verseText = document.getElementById('daily-verse-text')?.textContent || '';
+    const verseRef = document.getElementById('verse-reference')?.textContent || '';
+    const fullVerse = `${verseText} - ${verseRef}`;
+
+    navigator.clipboard.writeText(fullVerse).then(() => {
+        const copyBtn = document.querySelector('.btn-copy-verse');
+        if (!copyBtn) return;
+        const originalText = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            copyBtn.innerHTML = originalText;
+        }, 2000);
+    });
+}
+
+/* ------------------------------
+   Update Verse Date
+--------------------------------*/
+function updateVerseDate() {
+    const today = new Date();
+    const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    };
+    const verseDate = document.getElementById('verse-date');
+    if (verseDate) verseDate.textContent = today.toLocaleDateString('en-US', options);
+}
+updateVerseDate();
+</script>
+
 </body>
 </html>
