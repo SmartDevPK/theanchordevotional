@@ -1,3 +1,7 @@
+<?php
+include "admin_dashboards.php";
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1047,39 +1051,66 @@
                         <div class="stat-icon primary">
                             <i class="fas fa-book-open"></i>
                         </div>
-                        <div class="stat-number" id="total-devotions">0</div>
+                        <div class="stat-number" id="total-devotions">  <?php echo $total; ?></div>
+                        <div class="stat-label">Total Devotion</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon primary">
+                            <i class="fas fa-book-open"></i>
+                        </div>
+                        <div class="stat-number" id="total-devotions">  <?php echo $approved_total; ?></div>
                         <div class="stat-label">Total Devotions</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon primary">
+                            <i class="fas fa-book-open"></i>
+                        </div>
+                        <div class="stat-number" id="total-devotions">  <?php echo $approved_verses_total; ?></div>
+                        <div class="stat-label">Daily Varse</div>
+                    </div>
+                      <div class="stat-card">
+                        <div class="stat-icon primary">
+                            <i class="fas fa-book-open"></i>
+                        </div>
+                        <div class="stat-number" id="total-devotions"> <?php echo $total_subscribers; ?></div>
+                        <div class="stat-label">Subscribers</div>
+                    </div>
+                    
                     <div class="stat-card">
                         <div class="stat-icon success">
                             <i class="fas fa-pray"></i>
                         </div>
-                        <div class="stat-number" id="total-prayers">0</div>
+                        <div class="stat-number" id="total-prayers"><?php echo $prayer_total; ?></div>
                         <div class="stat-label">Prayer Requests</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon warning">
                             <i class="fas fa-users"></i>
                         </div>
-                        <div class="stat-number" id="total-resources">0</div>
+                        <div class="stat-number" id="total-resources"><?php echo  $total_family_resources;?></div>
                         <div class="stat-label">Family Resources</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon info">
-                            <i class="fas fa-calendar-day"></i>
-                        </div>
-                        <div class="stat-number" id="days-active">365</div>
-                        <div class="stat-label">Days Active</div>
-                    </div>
+                   
                 </div>
-
-                <div class="section-card">
+                 <div class="section-card">
                     <h4 class="section-title">
                         <i class="fas fa-chart-line"></i>
                         Recent Activity
                     </h4>
                     <div class="devotions-list" id="recent-activity">
-                        <!-- Recent activity will be populated here -->
+                        <?php
+        if (count($activities) > 0) {
+            foreach ($activities as $act) {
+                echo "<div class='activity-item'>";
+                echo "<strong>" . htmlspecialchars($act['activity_type']) . "</strong>: ";
+                echo htmlspecialchars($act['description']);
+                echo " <small>(" . $act['created_at'] . ")</small>";
+                echo "</div>";
+            }
+        } else {
+            echo "<p>No recent activity found.</p>";
+        }
+        ?>
                     </div>
                 </div>
             </div>
@@ -1728,9 +1759,9 @@
             const prayers = getFromStorage('prayers') || [];
 
             // Update stats
-            document.getElementById('total-devotions').textContent = devotions.length;
-            document.getElementById('total-resources').textContent = resources.length;
-            document.getElementById('total-prayers').textContent = prayers.length;
+            // document.getElementById('total-devotions').textContent = devotions.length;
+            // document.getElementById('total-resources').textContent = resources.length;
+            // document.getElementById('total-prayers').textContent = prayers.length;
 
             // Populate lists
             populatePastDevotions(devotions);
