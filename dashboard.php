@@ -1,10 +1,6 @@
 <?php
 include "admin_dashboards.php";
 ?>
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1186,6 +1182,10 @@ include "admin_dashboards.php";
                             <button type="submit" class="btn btn-success btn-lg">
                                 <i class="fas fa-home"></i> Update Live Homepage
                             </button>
+                     <a href="edit_homepage.php?id=1" class="btn btn-primary btn-lg">
+                        <i class="fas fa-edit"></i>
+                        Edit Page
+                    </a>
                             <small class="form-text text-muted">
                                 <i class="fas fa-info-circle"></i> 
                                 This will immediately update the homepage hero section
