@@ -3,6 +3,8 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+include 'daily-verse.php';
+
 // DB connection params
 $host = "localhost";
 $port = 3307;
@@ -1374,11 +1376,11 @@ if (isset($_GET['error'])) {
             <div class="verse-card">
                 <div class="verse-header">
                     <h3>Verse of the Day</h3>
-                    <span class="verse-date" id="verse-date"><?php echo $today; ?></span>
+                    <span class="verse-date" id="verse-date"><?php echo htmlspecialchars($today ?? ''); ?></span>
                 </div>
                 <div class="verse-text">
-                    <p id="daily-verse-text"><?php echo htmlspecialchars($verseText); ?></p>
-                    <cite id="verse-reference"><?php echo htmlspecialchars($verseRef); ?></cite>
+                    <cite id="verse-reference"><?php echo htmlspecialchars($verseRef ?? ''); ?></cite>
+                    <p id="daily-verse-text"><?php echo htmlspecialchars($verseText ?? ''); ?></p>
                 </div>
                 <div class="verse-actions">
                     <button class="btn-share-verse" onclick="shareVerse()">
