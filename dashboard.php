@@ -959,7 +959,7 @@
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <img src="anchor-logo.png" alt="Logo" class="sidebar-logo">
+            <img src="theachor.png" alt="Logo" class="sidebar-logo">
             <h3>The Anchor</h3>
             <p>Admin Dashboard</p>
         </div>

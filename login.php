@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>The Anchor Devotional - Admin Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
+   <style>
         :root {
             --primary: #ad3128;
             --secondary: #2c3e50;
@@ -70,9 +70,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 30px;
         }
 
+        .logo-img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.05);
+        }
+
         .logo h2 {
             color: var(--secondary);
             font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #6c757d;
+            margin-bottom: 0;
+            font-size: 0.9rem;
         }
 
         .form-group {
@@ -140,7 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <body>
     <div class="login-container">
-        <div class="logo">
+            <div class="logo">
+            <img src="theachor.png" alt="The Anchor Devotional Logo" class="logo-img">
             <h2>The Anchor Devotional</h2>
             <p>Admin Login</p>
         </div>
