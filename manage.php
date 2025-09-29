@@ -192,11 +192,7 @@ $stmt->close();
                         </thead>
                         <tbody>
                             <?php if (empty($devotions)): ?>
-                                <tr>
-                                    <td colspan="6" class="text-center py-4">
-                                        No devotions found. <a href="admin.php">Add a new devotion</a>
-                                    </td>
-                                </tr>
+                              
                             <?php else: ?>
                                 <?php foreach ($devotions as $devotion): ?>
                                     <tr>

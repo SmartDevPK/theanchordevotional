@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sections_json = json_encode($sections);
 
     // Insert into database
-    $stmt = $conn->prepare("INSERT INTO todayDevotions (verse_text, verse_reference, introduction_text, sections) VALUES (?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO devotional (verse_text, verse_reference, introduction_text, sections) VALUES (?, ?, ?, ?)");
     $stmt->bind_param("ssss", $verse_text, $verse_reference, $introduction_text, $sections_json);
 
     if ($stmt->execute()) {

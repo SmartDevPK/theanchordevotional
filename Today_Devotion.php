@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success_msg = "Devotional updated successfully!";
         } else {
             // Add new devotional
-            $sql = "INSERT INTO today_Devotion (title, verse, content) VALUES ('$title', '$verse', '$content')";
+            $sql = "INSERT INTO devotional (title, verse, content) VALUES ('$title', '$verse', '$content')";
             $success_msg = "Devotional added successfully!";
         }
 

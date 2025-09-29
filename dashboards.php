@@ -995,7 +995,7 @@ include "admin_dashboards.php";
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link" data-page="prayer-requests">
+                    <a href="Prayer Requests.php" class="" data-page="prayer-requests">
                         <i class="fas fa-pray"></i> Prayer Requests
                     </a>
                 </li>
@@ -1480,7 +1480,11 @@ include "admin_dashboards.php";
                         Prayer Requests Management
                     </h4>
                     <div class="devotions-list" id="prayer-requests-list">
-                        <!-- Prayer requests will be populated here -->
+                           <a href="delete_prayer.php?id=<?= $prayer['id']; ?>" 
+                        onclick="return confirm('Are you sure you want to delete this prayer request?');" 
+                        class="btn btn-danger">
+                        Delete
+                         </a>
                     </div>
                 </div>
             </div>

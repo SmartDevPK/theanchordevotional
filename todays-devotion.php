@@ -17,9 +17,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// ==============================================
-// FETCH DEVOTION DATA
-// ==============================================
+
 
 // Fetch latest devotion from devotion table
 $sql = "SELECT topic, image_path, pdf_path, date FROM devotion ORDER BY date DESC LIMIT 1";
