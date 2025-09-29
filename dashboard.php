@@ -1005,7 +1005,7 @@ include "admin_dashboards.php";
                     </a>
                 </li>
                 <li>
-                    <a href="index.html">
+                    <a href="index.php">
                         <i class="fas fa-sign-out-alt"></i> Back to Website
                     </a>
                 </li>
@@ -1032,9 +1032,9 @@ include "admin_dashboards.php";
             <div class="user-menu">
                 <span id="user-welcome">Welcome, Pastor Ezra</span>
                 <div class="user-actions">
-                    <button class="btn btn-sm btn-outline-danger" onclick="anchorAuth.logout()" title="Logout">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </button>
+                  <button class="btn btn-sm btn-outline-danger" onclick="logout()" title="Logout">
+                     <i class="fas fa-sign-out-alt"></i> Logout
+                  </button>
                     <button class="btn btn-sm btn-outline-primary d-md-none" id="sidebarToggle" style="display: none;">
                         <i class="fas fa-bars"></i>
                     </button>
@@ -1364,18 +1364,18 @@ include "admin_dashboards.php";
                         <i class="fas fa-upload"></i>
                         Upload New Resource
                     </h4>
-                    <form id="resource-form">
+                    <form id="resource-form" action="family_resources.php" method="POST" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="resource-name">Resource Name</label>
-                                    <input type="text" class="form-control" id="resource-name" placeholder="Enter resource name" required>
+                                    <input type="text" name="name" class="form-control" id="resource-name" placeholder="Enter resource name" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="resource-category">Category</label>
-                                    <select class="form-control" id="resource-category" required>
+                                    <select class="form-control"  name="category"  id="resource-category" required>
                                         <option value="">Select Category</option>
                                         <option value="children">Children</option>
                                         <option value="teens">Teens</option>
@@ -1391,22 +1391,22 @@ include "admin_dashboards.php";
 
                         <div class="form-group">
                             <label for="resource-description">Description</label>
-                            <textarea class="form-control" id="resource-description" rows="3" placeholder="Describe this resource..." required></textarea>
+                            <textarea class="form-control" name="description" id="resource-description" rows="3" placeholder="Describe this resource..." required></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="resource-thumbnail">Thumbnail Image</label>
-                            <input type="file" class="form-control" id="resource-thumbnail" accept="image/*" required>
+                            <input type="file" class="form-control" name="thumbnail" id="resource-thumbnail" accept="image/*" required>
                             <img id="thumbnail-preview" class="image-preview" style="display:none;">
                         </div>
 
                         <div class="form-group">
                             <label for="resource-file">Resource File (PDF, DOC, etc.)</label>
-                            <div class="file-upload-area" id="file-drop-area">
-                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                <p>Drag and drop your file here or click to select</p>
-                                <input type="file" class="form-control" id="resource-file" accept=".pdf,.doc,.docx,.txt" required style="display:none;">
-                            </div>
+                            <div class="file-upload-area" id="file-drop-area" style="cursor:pointer;">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <p>Drag and drop your file here or click to select</p>
+                            <input type="file" class="form-control" name="resource_file" id="resource-file" accept=".pdf,.doc,.docx,.txt" required style="display:none;">
+                        </div>
                             <div id="file-info" style="display:none;" class="mt-2">
                                 <small class="text-muted">Selected: <span id="file-name"></span></small>
                             </div>
@@ -2171,6 +2171,23 @@ document.querySelectorAll('#editor-toolbar .color-picker').forEach(input => {
         editor.focus();
     });
 });
+
+function logout() {
+    if (anchorAuth && anchorAuth.logout) {
+        anchorAuth.logout(); // Perform logout
+
+        // After logout, redirect to login page
+        setTimeout(() => {
+            window.location.href = 'login.php';
+        }, 500); // wait a short time to ensure logout
+    } else {
+        // fallback
+        window.location.href = 'login.php';
+    }
+}
+
+
+
         
     </script>
 </body>

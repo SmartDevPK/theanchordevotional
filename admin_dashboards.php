@@ -62,7 +62,7 @@ if ($result5) {
 }
 
 //Total family resources
-$sql6 = "SELECT COUNT(*) AS total_family_resource FROM family";
+$sql6 = "SELECT COUNT(*) AS total_family_resource FROM family_resources";
 $result6 = $mysqli->query($sql6);
 
 if ($result6) {
@@ -89,8 +89,8 @@ $res2 = $mysqli->query($sql02);
 while ($row = $res2->fetch_assoc()) { $activities[] = $row; }
 
 // Family
-$sql03 = "SELECT name AS description, created_at, 'Family' AS activity_type 
-         FROM family ORDER BY created_at DESC LIMIT 5";
+$sql03 = "SELECT name AS description, created_at, 'family_resources' AS activity_type 
+         FROM family_resources ORDER BY created_at DESC LIMIT 5";
 $res3 = $mysqli->query($sql03);
 while ($row = $res3->fetch_assoc()) { $activities[] = $row; }
 
