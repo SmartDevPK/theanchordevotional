@@ -995,7 +995,7 @@ include "admin_dashboards.php";
                     </a>
                 </li>
                 <li>
-                    <a href="Prayer Requests.php" class="" data-page="prayer-requests">
+                    <a href="prayer_requests.php" class="" data-page="prayer-requests">
                         <i class="fas fa-pray"></i> Prayer Requests
                     </a>
                 </li>
