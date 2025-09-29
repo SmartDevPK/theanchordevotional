@@ -360,7 +360,7 @@ $stats = $stats_result->fetch_assoc();
                 <i class="fas fa-anchor"></i> The Anchor
             </a>
             <div style="display: flex; gap: 20px;">
-                <a href="dashboardForm.php" style="color: var(--dark); text-decoration: none; font-weight: 500;">Dashboard</a>
+                <a href="dashboard.php" style="color: var(--dark); text-decoration: none; font-weight: 500;">Dashboard</a>
                 <a href="devotions.php" style="color: var(--dark); text-decoration: none; font-weight: 500;">Devotions</a>
             </div>
         </div>
@@ -454,7 +454,7 @@ $stats = $stats_result->fetch_assoc();
                     <i class="fas fa-praying-hands"></i>
                     <h3>No Prayer Requests Yet</h3>
                     <p>When people submit prayer requests, they will appear here.</p>
-                    <a href="dashboardForm.php" class="btn btn-primary" style="margin-top: 20px;">
+                    <a href="dashboard.php" class="btn btn-primary" style="margin-top: 20px;">
                         <i class="fas fa-arrow-left"></i> Return to Dashboard
                     </a>
                 </div>
@@ -464,7 +464,7 @@ $stats = $stats_result->fetch_assoc();
         <!-- Navigation -->
         <?php if ($result->num_rows > 0): ?>
         <div class="navigation">
-            <a href="dashboardForm.php" class="btn btn-secondary">
+            <a href="dashboard.php" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
             <a href="devotions.php" class="btn btn-primary">
