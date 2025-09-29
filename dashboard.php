@@ -1202,41 +1202,41 @@ include "admin_dashboards.php";
                         <i class="fas fa-book-open"></i>
                         Today's Devotion Entry
                     </h4>
-                    <form id="devotion-form">
+                    <form id="devotion-form" action="add_devotion.php" method="POST" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="devotion-topic">Topic/Title</label>
-                                    <input type="text" class="form-control" id="devotion-topic" placeholder="Enter devotion topic" required>
+                                    <input type="text" class="form-control" name="topic" id="devotion-topic" placeholder="Enter devotion topic" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="devotion-date">Date</label>
-                                    <input type="date" class="form-control" id="devotion-date" required>
+                                    <input type="date" class="form-control" name="devotion_date" id="devotion-date" required>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="devotion-image">Devotion Image</label>
-                            <input type="file" class="form-control" id="devotion-image" accept="image/*">
+                            <input type="file" class="form-control" name="devotion_image" id="devotion-image" accept="image/*">
                             <img id="devotion-preview" class="image-preview" style="display:none;">
                         </div>
 
                         <div class="form-group">
                             <label for="devotion-verse">Scripture Verse</label>
-                            <textarea class="form-control" id="devotion-verse" rows="3" placeholder="Enter the main Bible verse for this devotion..." required></textarea>
+                            <textarea class="form-control" id="devotion-verse" name="devotion_verse" rows="3" placeholder="Enter the main Bible verse for this devotion..." required></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="verse-reference">Scripture Reference</label>
-                            <input type="text" class="form-control" id="verse-reference" placeholder="e.g., John 3:16, Psalm 23:1" required>
+                            <input type="text" class="form-control" name="verse_reference" id="verse-reference" placeholder="e.g., John 3:16, Psalm 23:1" required>
                         </div>
 
                         <div class="form-group">
                             <label for="devotion-intro">Devotion Introduction</label>
-                            <textarea class="form-control" id="devotion-intro" rows="4" placeholder="Write a compelling introduction..." required></textarea>
+                            <textarea class="form-control" name="devotion_intro" id="devotion-intro" rows="4" placeholder="Write a compelling introduction..." required></textarea>
                         </div>
 
                         <div class="form-group">
@@ -1323,17 +1323,17 @@ include "admin_dashboards.php";
                                 </div>
                             </div>
                             <div class="rich-editor" id="devotion-content" contenteditable="true" placeholder="Write the complete devotional content with rich formatting..."></div>
-                            <textarea id="devotion-content-hidden" style="display: none;" required></textarea>
+                            <textarea id="devotion-content-hidden" name="devotion_content" style="display: none;" required></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="devotion-prayer">Closing Prayer (Optional)</label>
-                            <textarea class="form-control" id="devotion-prayer" rows="3" placeholder="Add a closing prayer..."></textarea>
+                            <textarea class="form-control" name="devotion_prayer" id="devotion-prayer" rows="3" placeholder="Add a closing prayer..."></textarea>
                         </div>
 
                         <div class="form-group">
                             <label for="devotion-tags">Tags (comma-separated)</label>
-                            <input type="text" class="form-control" id="devotion-tags" placeholder="faith, prayer, hope, love">
+                            <input type="text" class="form-control" name="devotion_tags" id="devotion-tags" placeholder="faith, prayer, hope, love">
                         </div>
 
                         <div class="form-actions">
@@ -2126,6 +2126,46 @@ include "admin_dashboards.php";
             });
         });
 
+        // Copy content to hidden textarea on submit
+document.getElementById('devotion-form').addEventListener('submit', function () {
+    document.getElementById('devotion-content-hidden').value =
+        document.getElementById('devotion-content').innerHTML;
+});
+
+// Ensure Enter inserts <p> tags
+const editor = document.getElementById('devotion-content');
+editor.addEventListener('focus', function() {
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+});
+
+// Toolbar button functionality
+document.querySelectorAll('#editor-toolbar .toolbar-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        const command = button.dataset.command;
+        document.execCommand(command, false, null);
+        editor.focus();
+    });
+});
+
+// Toolbar select elements (font size, font family)
+document.querySelectorAll('#editor-toolbar .toolbar-select').forEach(select => {
+    select.addEventListener('change', () => {
+        const command = select.dataset.command;
+        const value = select.value;
+        document.execCommand(command, false, value);
+        editor.focus();
+    });
+});
+
+// Color pickers
+document.querySelectorAll('#editor-toolbar .color-picker').forEach(input => {
+    input.addEventListener('change', () => {
+        const command = input.dataset.command;
+        const value = input.value;
+        document.execCommand(command, false, value);
+        editor.focus();
+    });
+});
         
     </script>
 </body>

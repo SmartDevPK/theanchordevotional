@@ -14,7 +14,7 @@ if ($result) {
 }
 
 // Total approved devotions 
-$sql2 = "SELECT COUNT(*) AS approved_devotions FROM devotion"; 
+$sql2 = "SELECT COUNT(*) AS approved_devotions FROM devotions"; 
 $result2 = $mysqli->query($sql2);
 
 if ($result2) {
