@@ -1,2194 +1,872 @@
 <?php
-include "admin_dashboards.php";
+// Start session and security checks at the very top
+session_start();
+
+// 1. Check if user is logged in
+// if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+//     session_unset();
+//     session_destroy();
+//     header("Location: login.php");
+//     exit();
+// }
+
+// 2. Verify IP address (optional security measure)
+if ($_SESSION['user_ip'] !== $_SERVER['REMOTE_ADDR']) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
+// 3. Check session timeout (10 minutes)
+if (time() - $_SESSION['last_activity'] > 600) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php?timeout=1");
+    exit();
+}
+
+// Update last activity time
+$_SESSION['last_activity'] = time();
+
+// Include database connection after security checks
+require 'db.php';
+
+// Initialize messages
+$errorMessage = '';
+$successMessage = '';
+
+// Fetch all dashboard data
+try {
+    // 1. Get counts for all tables
+    $counts = [];
+    $tables = ['devotion', 'devotions', 'prayer_requests', 'testimonies', 'subscribers', 'comments'];
+
+    foreach ($tables as $table) {
+        $query = $mysqli->prepare("SELECT COUNT(*) AS total FROM $table");
+        $query->execute();
+        $result = $query->get_result();
+        $row = $result->fetch_assoc();
+        $counts[$table] = $row['total'] ?? 0;
+        $query->close();
+    }
+
+    // 2. Fetch devotion data
+    $devotion = [];
+    $devotionQuery = $mysqli->prepare("SELECT * FROM devotion ORDER BY date LIMIT 5");
+    $devotionQuery->execute();
+    $devotionResult = $devotionQuery->get_result();
+    while ($row = $devotionResult->fetch_assoc()) {
+        $devotion[] = $row;
+    }
+    $devotionQuery->close();
+
+    // 3. Fetch devotions with pagination
+    $limit = 10;
+    $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+    $offset = ($page - 1) * $limit;
+
+    $count_sql = $mysqli->prepare("SELECT COUNT(*) as total FROM devotions");
+    $count_sql->execute();
+    $total_rows = $count_sql->get_result()->fetch_assoc()['total'];
+    $total_pages = ceil($total_rows / $limit);
+    $count_sql->close();
+
+    $devotions = [];
+    $sql = $mysqli->prepare("SELECT id, title, devotion_date, image, excerpt FROM devotions ORDER BY devotion_date DESC LIMIT ? OFFSET ?");
+    $sql->bind_param("ii", $limit, $offset);
+    $sql->execute();
+    $result = $sql->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $devotions[] = $row;
+    }
+    $sql->close();
+
+    // 4. Fetch prayer requests
+    $prayerRequests = [];
+    $prayerQuery = $mysqli->prepare("SELECT name, email, prayer AS title, request_date AS created_at FROM prayer_requests ORDER BY created_at DESC LIMIT 20");
+    $prayerQuery->execute();
+    $prayerResult = $prayerQuery->get_result();
+    while ($row = $prayerResult->fetch_assoc()) {
+        $prayerRequests[] = $row;
+    }
+    $prayerQuery->close();
+
+    // 5. Fetch testimonies
+    $testimonies = [];
+    $testimonyQuery = $mysqli->prepare("SELECT * FROM testimonies ORDER BY date DESC LIMIT 20");
+    $testimonyQuery->execute();
+    $testimonyResult = $testimonyQuery->get_result();
+    while ($row = $testimonyResult->fetch_assoc()) {
+        $testimonies[] = $row;
+    }
+    $testimonyQuery->close();
+
+    // 6. Fetch subscribers
+    $subscribers = [];
+    $subscriberQuery = $mysqli->prepare("SELECT * FROM subscribers ORDER BY subscribed_at DESC LIMIT 20");
+    $subscriberQuery->execute();
+    $subscriberResult = $subscriberQuery->get_result();
+    while ($row = $subscriberResult->fetch_assoc()) {
+        $subscribers[] = $row;
+    }
+    $subscriberQuery->close();
+
+    // 7. Fetch comments
+    $comments = [];
+    $commentQuery = $mysqli->prepare("SELECT * FROM comments ORDER BY created_at DESC LIMIT 50");
+    $commentQuery->execute();
+    $commentResult = $commentQuery->get_result();
+    while ($row = $commentResult->fetch_assoc()) {
+        $comments[] = $row;
+    }
+    $commentQuery->close();
+
+} catch (Exception $e) {
+    $errorMessage = "Database error: " . htmlspecialchars($e->getMessage());
+}
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="anchor-logo.png">
-    <link rel="shortcut icon" type="image/png" href="anchor-logo.png">
-    <link rel="apple-touch-icon" href="anchor-logo.png">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Anchor Devotional - Admin Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Anchor Authentication System -->
-    <script src="anchor-auth.js"></script>
-    <!-- Real-time Website Updater -->
-    <script src="website-updater.js"></script>
     <style>
         :root {
             --primary: #ad3128;
             --secondary: #2c3e50;
             --light: #f8f9fa;
             --dark: #212529;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --sidebar-width: 280px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
         }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background-color: #f5f7fa;
-            overflow-x: hidden;
+            background-color: #f5f5f5;
         }
 
-        /* Sidebar Styles */
         .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: var(--sidebar-width);
-            height: 100vh;
-            background: linear-gradient(180deg, var(--secondary) 0%, #34495e 100%);
+            min-height: 100vh;
+            background-color: var(--dark);
             color: white;
-            transition: all 0.3s ease;
-            z-index: 1000;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            width: 250px;
+            position: fixed;
+            transition: all 0.3s;
         }
 
         .sidebar-header {
-            padding: 25px 20px;
-            background: rgba(0, 0, 0, 0.2);
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.2);
         }
 
-        .sidebar-logo {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            margin-bottom: 15px;
-        }
-
-        .sidebar-header h3 {
-            margin-bottom: 5px;
-            font-weight: 600;
-            font-size: 1.3rem;
-        }
-
-        .sidebar-header p {
-            font-size: 0.85rem;
-            opacity: 0.8;
-            margin: 0;
-        }
-
-        .sidebar-nav {
-            padding: 20px 0;
-        }
-
-        .sidebar-nav ul {
+        .sidebar-menu {
             list-style: none;
             padding: 0;
-            margin: 0;
         }
 
-        .sidebar-nav li {
-            margin-bottom: 5px;
-        }
-
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
-            padding: 12px 25px;
-            color: rgba(255, 255, 255, 0.8);
+        .sidebar-menu li a {
+            padding: 12px 20px;
+            display: block;
+            color: rgba(255, 255, 255, 0.7);
             text-decoration: none;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
+            transition: all 0.3s;
         }
 
-        .sidebar-nav a:hover,
-        .sidebar-nav a.active {
-            background: rgba(255, 255, 255, 0.1);
+        .sidebar-menu li a:hover,
+        .sidebar-menu li a.active {
             color: white;
-            border-left-color: var(--primary);
-            transform: translateX(5px);
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
-        .sidebar-nav i {
-            margin-right: 12px;
+        .sidebar-menu li a i {
+            margin-right: 10px;
             width: 20px;
             text-align: center;
-            font-size: 1.1rem;
         }
 
-        /* Main Content */
         .main-content {
-            margin-left: var(--sidebar-width);
-            min-height: 100vh;
+            margin-left: 250px;
+            transition: all 0.3s;
+            padding: 20px;
         }
 
-        .top-nav {
+        .dashboard-card {
             background: white;
-            padding: 15px 30px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            color: var(--primary);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            margin-right: 10px;
-        }
-
-        .mobile-menu-btn:hover {
-            background: #f8f9fa;
-            color: var(--dark);
-        }
-
-        .breadcrumb {
-            margin: 0;
-            background: transparent;
-            font-size: 0.9rem;
-        }
-
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .user-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .user-actions .btn {
-            border-radius: 20px;
-            padding: 5px 12px;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-        }
-
-        .user-actions .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .content-area {
-            padding: 30px;
-        }
-
-        .page-section {
-            display: none;
-        }
-
-        .page-section.active {
-            display: block;
-        }
-
-        .section-card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e9ecef;
-        }
-
-        .section-title {
-            color: var(--primary);
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            color: var(--dark);
-            margin-bottom: 8px;
-            display: block;
-        }
-
-        .form-control {
-            border-radius: 8px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 0.2rem rgba(173, 49, 40, 0.25);
-        }
-
-        .btn {
-            border-radius: 8px;
-            padding: 12px 25px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, #8a2520 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #8a2520 0%, var(--primary) 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(173, 49, 40, 0.3);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: var(--dark);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .image-preview {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 8px;
-            margin-top: 10px;
-            border: 2px solid #e9ecef;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
         }
 
         .stat-card {
-            background: white;
-            border-radius: 12px;
+            text-align: center;
             padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e9ecef;
-            transition: transform 0.3s ease;
         }
 
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px;
-            font-size: 1.5rem;
-            color: white;
-        }
-
-        .stat-icon.primary { background: var(--primary); }
-        .stat-icon.success { background: var(--success); }
-        .stat-icon.warning { background: var(--warning); }
-        .stat-icon.info { background: #17a2b8; }
-
-        .stat-number {
+        .stat-card i {
             font-size: 2rem;
-            font-weight: 700;
-            color: var(--dark);
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .devotions-list {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .devotion-item {
-            padding: 15px 20px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background-color 0.3s ease;
-        }
-
-        .devotion-item:hover {
-            background-color: #f8f9fa;
-        }
-
-        .devotion-item:last-child {
-            border-bottom: none;
-        }
-
-        .devotion-info h6 {
-            margin: 0 0 5px 0;
-            color: var(--primary);
-        }
-
-        .devotion-info small {
-            color: #6c757d;
-        }
-
-        .devotion-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn-sm {
-            padding: 5px 12px;
-            font-size: 0.8rem;
-        }
-
-        .alert {
-            border-radius: 8px;
-            border: none;
-            padding: 15px 20px;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .file-upload-area {
-            border: 2px dashed #dee2e6;
-            border-radius: 8px;
-            padding: 30px;
-            text-align: center;
-            background: #f8f9fa;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .file-upload-area:hover {
-            border-color: var(--primary);
-            background: rgba(173, 49, 40, 0.05);
-        }
-
-        .file-upload-area.dragover {
-            border-color: var(--primary);
-            background: rgba(173, 49, 40, 0.1);
-        }
-
-        .resources-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .resource-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e9ecef;
-            transition: transform 0.3s ease;
-        }
-
-        .resource-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .resource-thumbnail {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-        }
-
-        .resource-info {
-            padding: 15px;
-        }
-
-        .resource-name {
-            font-weight: 600;
-            color: var(--primary);
             margin-bottom: 10px;
         }
 
-        .resource-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
+        .stat-card h2 {
+            font-size: 2rem;
+            margin: 10px 0;
         }
 
-        /* Rich Text Editor Styles */
-        .rich-editor-toolbar {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-bottom: none;
-            border-radius: 8px 8px 0 0;
-            padding: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            align-items: center;
+        .page-content {
+            display: none;
         }
 
-        .toolbar-group {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding-right: 15px;
-            border-right: 1px solid #dee2e6;
-            margin-right: 10px;
-        }
-
-        .toolbar-group:last-child {
-            border-right: none;
-            margin-right: 0;
-            padding-right: 0;
-        }
-
-        .toolbar-btn {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 6px 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 14px;
-            color: #495057;
-        }
-
-        .toolbar-btn:hover {
-            background: #e9ecef;
-            border-color: #adb5bd;
-        }
-
-        .toolbar-btn.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: white;
-        }
-
-        .toolbar-select {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 6px 8px;
-            cursor: pointer;
-            font-size: 14px;
-            min-width: 80px;
-        }
-
-        .toolbar-select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 0.2rem rgba(173, 49, 40, 0.25);
-        }
-
-        .color-picker {
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            width: 32px;
-            height: 32px;
-            padding: 0;
-            cursor: pointer;
-            background: none;
-        }
-
-        .rich-editor {
-            border: 1px solid #dee2e6;
-            border-radius: 0 0 8px 8px;
-            min-height: 300px;
-            padding: 15px;
-            font-family: 'Georgia', serif;
-            font-size: 14px;
-            line-height: 1.6;
-            background: white;
-            overflow-y: auto;
-            max-height: 500px;
-        }
-
-        .rich-editor:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 0.2rem rgba(173, 49, 40, 0.25);
-        }
-
-        .rich-editor[placeholder]:empty:before {
-            content: attr(placeholder);
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        .rich-editor p {
-            margin: 0 0 1em 0;
-        }
-
-        .rich-editor h1, .rich-editor h2, .rich-editor h3 {
-            color: var(--primary);
-            margin: 1em 0 0.5em 0;
-        }
-
-        .rich-editor blockquote {
-            border-left: 4px solid var(--primary);
-            margin: 1em 0;
-            padding-left: 1em;
-            font-style: italic;
-            background: rgba(173, 49, 40, 0.05);
-        }
-
-        .rich-editor ul, .rich-editor ol {
-            margin: 0.5em 0;
-            padding-left: 2em;
-        }
-
-        .rich-editor li {
-            margin: 0.25em 0;
-        }
-
-        /* Loading and Animation States */
-        .page-section {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-        }
-
-        .page-section.active {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .sidebar {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .overlay {
-            transition: opacity 0.3s ease;
-        }
-
-        /* Focus improvements for accessibility */
-        .btn:focus, .form-control:focus, .toolbar-btn:focus {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
-        }
-
-        /* Touch-friendly improvements */
-        .btn, .form-control, .toolbar-btn {
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-        }
-
-        /* Smooth scrolling for iOS */
-        .content-area {
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Better touch targets */
-        @media (max-width: 768px) {
-            .nav-link, .btn, .toolbar-btn {
-                min-height: 44px;
-                min-width: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .sidebar .nav-link {
-                padding: 15px 20px;
-                min-height: 48px;
-            }
-        }
-
-        /* Responsive Design - Consistent with Landing Page */
-        @media (max-width: 992px) {
-            .container {
-                max-width: 100%;
-                padding: 0 20px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
-            
-            .card {
-                margin-bottom: 20px;
-            }
-            
-            .rich-text-editor {
-                min-height: 250px;
-            }
+        .page-content.active {
+            display: block;
         }
 
         @media (max-width: 768px) {
             .sidebar {
-                position: fixed;
-                top: 0;
-                left: 0;
-                height: 100vh;
-                width: 280px;
-                z-index: 1000;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-                background: white;
-                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                margin-left: -250px;
             }
 
             .sidebar.active {
-                transform: translateX(0);
+                margin-left: 0;
             }
 
             .main-content {
                 margin-left: 0;
-                width: 100%;
             }
 
-            .header {
-                position: relative;
-                z-index: 999;
-            }
-
-            .mobile-menu-btn {
-                display: block;
-                background: none;
-                border: none;
-                font-size: 1.5rem;
-                color: var(--primary);
-                cursor: pointer;
-                margin-right: 15px;
-            }
-
-            .content-area {
-                padding: 15px;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .devotion-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-                padding: 15px;
-            }
-
-            .devotion-actions {
-                align-self: flex-end;
-                flex-direction: column;
-                gap: 8px;
-                width: 100%;
-            }
-
-            .devotion-actions .btn {
-                width: 100%;
-                text-align: center;
-            }
-
-            .form-row {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .toolbar-group {
-                flex-wrap: wrap;
-                gap: 5px;
-            }
-
-            .toolbar-btn {
-                min-width: 35px;
-                height: 35px;
-                font-size: 0.9rem;
-            }
-
-            .rich-text-editor {
-                min-height: 200px;
-                font-size: 16px; /* Prevent zoom on iOS */
-            }
-
-            .modal-dialog {
-                margin: 10px;
-            }
-
-            .btn {
-                padding: 12px 20px;
-                font-size: 1rem;
-            }
-
-            .card-title {
-                font-size: 1.25rem;
-            }
-
-            .overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                z-index: 999;
-                display: none;
-            }
-
-            .overlay.active {
-                display: block;
+            .main-content.active {
+                margin-left: 250px;
             }
         }
 
-        @media (max-width: 576px) {
-            .header h1 {
-                font-size: 1.5rem;
-            }
-
-            .stats-card h3 {
-                font-size: 1.8rem;
-            }
-
-            .stats-card p {
-                font-size: 0.9rem;
-            }
-
-            .card {
-                border-radius: 8px;
-                margin-bottom: 15px;
-            }
-
-            .card-body {
-                padding: 15px;
-            }
-
-            .devotion-item {
-                padding: 12px;
-            }
-
-            .toolbar-group {
-                gap: 3px;
-            }
-
-            .toolbar-btn {
-                min-width: 32px;
-                height: 32px;
-                font-size: 0.8rem;
-                padding: 4px;
-            }
-
-            .toolbar-select {
-                padding: 4px 6px;
-                font-size: 0.85rem;
-            }
-
-            .color-picker {
-                width: 32px;
-                height: 32px;
-            }
-
-            .rich-text-editor {
-                min-height: 180px;
-                font-size: 16px;
-                padding: 12px;
-            }
-
-            .btn {
-                padding: 10px 16px;
-                font-size: 0.9rem;
-            }
-
-            .btn-sm {
-                padding: 6px 12px;
-                font-size: 0.8rem;
-            }
-
-            .form-control {
-                font-size: 16px; /* Prevent zoom on iOS */
-            }
-
-            .modal-content {
-                margin: 5px;
-            }
-
-            .sidebar {
-                width: 260px;
-            }
-
-            .sidebar-nav a {
-                padding: 12px 20px;
-                font-size: 0.95rem;
-            }
-
-            .file-upload-area {
-                padding: 20px;
-                font-size: 0.9rem;
-            }
-
-            .alert {
-                padding: 12px 15px;
-                font-size: 0.9rem;
-            }
-        }
-
-        /* Extra small screens */
-        @media (max-width: 320px) {
-            .sidebar {
-                width: 240px;
-            }
-
-            .toolbar-btn {
-                min-width: 28px;
-                height: 28px;
-                font-size: 0.75rem;
-            }
-
-            .rich-text-editor {
-                min-height: 160px;
-                padding: 10px;
-            }
-
-            .content-area {
-                padding: 10px;
-            }
-        }
-
-        /* Real-time Website Update Styles */
-        .form-actions {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .form-actions button {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .form-actions button:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            transition: left 0.5s;
-        }
-
-        .form-actions button:hover:before {
-            left: 100%;
-        }
-
-        .live-update-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            color: #28a745;
-            font-size: 0.9rem;
-        }
-
-        .live-update-indicator::before {
-            content: '';
-            width: 8px;
-            height: 8px;
-            background: #28a745;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        .update-status {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            max-width: 300px;
-            z-index: 1000;
-        }
-
-        .preview-button {
-            border: 2px dashed #6c757d;
-            background: transparent;
-            color: #6c757d;
-        }
-
-        .preview-button:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-            background: rgba(173, 49, 40, 0.1);
+        .badge {
+            font-weight: 500;
         }
     </style>
 </head>
+
 <body>
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <img src="theachor.png" alt="Logo" class="sidebar-logo">
             <h3>The Anchor</h3>
-            <p>Admin Dashboard</p>
+            <small>Admin Dashboard</small>
         </div>
-        
-        <nav class="sidebar-nav">
-            <ul>
-                <li>
-                    <a href="#" class="nav-link active" data-page="dashboard">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="landing-page">
-                        <i class="fas fa-home"></i> Landing Page
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="todays-devotion">
-                        <i class="fas fa-book-open"></i> Today's Devotion
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="family-resources">
-                        <i class="fas fa-users"></i> Family Resources
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="past-devotions">
-                        <i class="fas fa-history"></i> Past Devotions
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="prayer-requests">
-                        <i class="fas fa-pray"></i> Prayer Requests
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="nav-link" data-page="settings">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
-                </li>
-                <li>
-                    <a href="index.php">
-                        <i class="fas fa-sign-out-alt"></i> Back to Website
-                    </a>
-                </li>
-            </ul>
-        </nav>
-    </div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="#" class="active" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="#" data-page="devotionals">
+                    <i class="fas fa-book-open"></i> Devotionals
+                    <span class="badge bg-primary float-end">
+                        <?= $counts['devotions'] ?? 0 ?>
+                    </span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-page="prayer-requests">
+                    <i class="fas fa-pray"></i> Prayer Requests
+                    <span class="badge bg-danger float-end">
+                        <?= $counts['prayer_requests'] ?? 0 ?>
+                    </span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-page="testimonies">
+                    <i class="fas fa-comment-alt"></i> Testimonies
+                    <span class="badge bg-success float-end">
+                        <?= $counts['testimonies'] ?? 0 ?>
+                    </span>
+                </a>
+            </li>
 
-    <!-- Mobile Overlay -->
-    <div class="overlay" id="mobileOverlay"></div>
+            <li>
+                <a href="admin_dashboard.php">
+                    <i class="fas fa-comment-alt"></i> Approve Testimonies
+
+                </a>
+            </li>
+
+            <li>
+                <a href="#" data-page="comments">
+                    <i class="fas fa-comments"></i> Comments
+                    <span class="badge bg-info float-end">
+                        <?= $counts['comments'] ?? 0 ?>
+                    </span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#" data-page="subscribers">
+                    <i class="fas fa-users"></i> Subscribers
+                    <span class="badge bg-success float-end">
+                        <?= $counts['subscribers'] ?? 0 ?>
+                    </span>
+                </a>
+            </li>
+            <li>
+                <a href="Today_Devotion.php">
+                    <i class="fas fa-sign-out-alt"></i> Today Devotion
+                </a>
+            </li>
+            <li>
+                <a href="today_dasborad.php">
+                    <i class="fas fa-sign-out-alt"></i> Past Devotionals
+                </a>
+            </li>
+            <li>
+                <a href="logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
 
     <!-- Main Content -->
-    <div class="main-content">
-        <div class="top-nav">
-            <div class="d-flex align-items-center">
-                <button class="mobile-menu-btn d-md-none" id="mobileMenuBtn">
+    <div class="main-content" id="main-content">
+        <!-- Top Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <button class="btn btn-outline-secondary d-md-none" id="sidebarToggle">
                     <i class="fas fa-bars"></i>
                 </button>
-                <nav aria-label="breadcrumb" class="flex-grow-1">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item active" id="breadcrumb-text">Dashboard</li>
-                    </ol>
-                </nav>
             </div>
-            <div class="user-menu">
-                <span id="user-welcome">Welcome, Pastor Ezra</span>
-                <div class="user-actions">
-                  <button class="btn btn-sm btn-outline-danger" onclick="logout()" title="Logout">
-                     <i class="fas fa-sign-out-alt"></i> Logout
-                  </button>
-                    <button class="btn btn-sm btn-outline-primary d-md-none" id="sidebarToggle" style="display: none;">
-                        <i class="fas fa-bars"></i>
-                    </button>
+        </nav>
+
+        <!-- Dashboard Page -->
+        <div class="page-content active" id="dashboard-page">
+            <div class="container-fluid">
+                <h4 class="mb-4">Dashboard Overview</h4>
+
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="dashboard-card stat-card">
+                            <i class="fas fa-book-open text-primary"></i>
+                            <h2><?= $counts['devotions'] ?? 0 ?></h2>
+                            <p>Devotionals</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="dashboard-card stat-card">
+                            <i class="fas fa-pray text-danger"></i>
+                            <h2><?= $counts['prayer_requests'] ?? 0 ?></h2>
+                            <p>Prayer Requests</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="dashboard-card stat-card">
+                            <i class="fas fa-comment-alt text-warning"></i>
+                            <h2><?= $counts['testimonies'] ?? 0 ?></h2>
+                            <p>Testimonies</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="dashboard-card stat-card">
+                            <i class="fas fa-users text-success"></i>
+                            <h2><?= $counts['subscribers'] ?? 0 ?></h2>
+                            <p>Subscribers</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Devotionals -->
+                <div class="dashboard-card mb-4">
+                    <div class="card-header">
+                        <span>Recent Devotionals</span>
+                        <a href="AddDevotion.php" class="btn btn-sm btn-primary">Add New</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Cover</th>
+                                        <th>Title</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($devotion)): ?>
+                                        <?php foreach ($devotion as $dev): ?>
+                                            <tr>
+                                                <td>
+                                                    <img src="<?= htmlspecialchars($dev['image_path'] ?? '') ?>"
+                                                        style="width:50px; height:50px; object-fit:cover;" alt="Cover">
+                                                </td>
+                                                <td><?= htmlspecialchars($dev['topic'] ?? '') ?></td>
+                                                <td><?= date("F j, Y", strtotime($dev['date'])) ?></td>
+                                                <td>
+                                                    <a href="edit_devotional.php?id=<?= $dev['id'] ?>"
+                                                        class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <form method="POST" action="delete_devotion.php" style="display:inline;">
+                                                        <input type="hidden" name="id"
+                                                            value="<?= htmlspecialchars($dev['id']) ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure you want to delete this devotional?')">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4">No devotionals found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="content-area">
-            <!-- Dashboard Overview -->
-            <div class="page-section active" id="dashboard">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon primary">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                        <div class="stat-number" id="total-devotions">  <?php echo $total; ?></div>
-                        <div class="stat-label">Landing page</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon primary">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                        <div class="stat-number" id="total-devotions">  <?php echo $approved_total; ?></div>
-                        <div class="stat-label">Today Devotional</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon primary">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                        <div class="stat-number" id="total-devotions">  <?php echo $approved_verses_total; ?></div>
-                        <div class="stat-label">Daily Varse</div>
-                    </div>
-                      <div class="stat-card">
-                        <div class="stat-icon primary">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                        <div class="stat-number" id="total-devotions"> <?php echo $total_subscribers; ?></div>
-                        <div class="stat-label">Subscribers</div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon success">
-                            <i class="fas fa-pray"></i>
-                        </div>
-                        <div class="stat-number" id="total-prayers"><?php echo $prayer_total; ?></div>
-                        <div class="stat-label">Prayer Requests</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon warning">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-number" id="total-resources"><?php echo  $total_family_resources;?></div>
-                        <div class="stat-label">Family Resources</div>
-                    </div>
-                   
-                </div>
-                 <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-chart-line"></i>
-                        Recent Activity
-                    </h4>
-                    <div class="devotions-list" id="recent-activity">
-                        <?php
-        if (count($activities) > 0) {
-            foreach ($activities as $act) {
-                echo "<div class='activity-item'>";
-                echo "<strong>" . htmlspecialchars($act['activity_type']) . "</strong>: ";
-                echo htmlspecialchars($act['description']);
-                echo " <small>(" . $act['created_at'] . ")</small>";
-                echo "</div>";
-            }
-        } else {
-            echo "<p>No recent activity found.</p>";
-        }
-        ?>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Landing Page Management -->
-            <div class="page-section" id="landing-page">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-home"></i>
-                        Landing Page Content
-                    </h4>
-                    <form id="homepage-form" action="save_homepage.php" method="POST" enctype="multipart/form-data">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="hero-title">Main Hero Title</label>
-                                    <input type="text" class="form-control" id="hero-title" name="hero-title" placeholder="Daily Spiritual Nourishment" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="hero-subtitle">Hero Subtitle</label>
-                                    <input type="text" class="form-control" id="hero-subtitle" name="hero-subtitle" placeholder="Anchor your soul in God's Word" required>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="hero-description">Hero Description</label>
-                            <textarea class="form-control" id="hero-description" name="hero-description" rows="3" placeholder="Describe your daily devotional ministry..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="cover-image">Cover Image</label>
-                            <input type="file" class="form-control" name="cover_image" id="cover-image" accept="image/*">
-                            <img id="cover-preview" class="image-preview" style="display:none;">
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="featured-topic">Featured Topic</label>
-                                    <input type="text" class="form-control" name="featured_topic" id="featured-topic" placeholder="Surviving the HEAT" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="featured-date">Publication Date</label>
-                                    <input type="date" class="form-control" name="featured_date" id="featured-date" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="featured-intro">Featured Devotion Intro</label>
-                            <textarea class="form-control" id="featured_intro" name="featured_intro" rows="4" placeholder="Brief introduction to today's devotion..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="verse-of-day">Verse of the Day</label>
-                            <textarea class="form-control" id="verse-of-day" name="verse_of_day" rows="3" placeholder="Enter today's featured Bible verse..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="verse-reference">Verse Reference</label>
-                            <input type="text" class="form-control" name="verse_reference" id="verse-reference" placeholder="John 3:16 (NIV)" required>
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-success btn-lg">
-                                <i class="fas fa-home"></i> Update Live Homepage
-                            </button>
-                     <a href="edit_homepage.php?id=1" class="btn btn-primary btn-lg">
-                        <i class="fas fa-edit"></i>
-                        Edit Page
+        <!-- Devotionals Page -->
+        <div class="page-content" id="devotionals-page">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4>Manage Devotionals</h4>
+                    <a href="add_devotional.php" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add New
                     </a>
-                            <small class="form-text text-muted">
-                                <i class="fas fa-info-circle"></i> 
-                                This will immediately update the homepage hero section
-                            </small>
-                        </div>
-                    </form>
                 </div>
-            </div>
 
-            <!-- Today's Devotion Management -->
-            <div class="page-section" id="todays-devotion">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-book-open"></i>
-                        Today's Devotion Entry
-                    </h4>
-                    <form id="devotion-form" action="add_devotion.php" method="POST" enctype="multipart/form-data">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="devotion-topic">Topic/Title</label>
-                                    <input type="text" class="form-control" name="topic" id="devotion-topic" placeholder="Enter devotion topic" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="devotion-date">Date</label>
-                                    <input type="date" class="form-control" name="devotion_date" id="devotion-date" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-image">Devotion Image</label>
-                            <input type="file" class="form-control" name="devotion_image" id="devotion-image" accept="image/*">
-                            <img id="devotion-preview" class="image-preview" style="display:none;">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-verse">Scripture Verse</label>
-                            <textarea class="form-control" id="devotion-verse" name="devotion_verse" rows="3" placeholder="Enter the main Bible verse for this devotion..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="verse-reference">Scripture Reference</label>
-                            <input type="text" class="form-control" name="verse_reference" id="verse-reference" placeholder="e.g., John 3:16, Psalm 23:1" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-intro">Devotion Introduction</label>
-                            <textarea class="form-control" name="devotion_intro" id="devotion-intro" rows="4" placeholder="Write a compelling introduction..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-content">Full Devotion Content</label>
-                            <div class="rich-editor-toolbar" id="editor-toolbar">
-                                <div class="toolbar-group">
-                                    <button type="button" class="toolbar-btn" data-command="bold" title="Bold">
-                                        <i class="fas fa-bold"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="italic" title="Italic">
-                                        <i class="fas fa-italic"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="underline" title="Underline">
-                                        <i class="fas fa-underline"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="toolbar-group">
-                                    <select class="toolbar-select" data-command="fontSize" title="Font Size">
-                                        <option value="1">8pt</option>
-                                        <option value="2">10pt</option>
-                                        <option value="3" selected>12pt</option>
-                                        <option value="4">14pt</option>
-                                        <option value="5">18pt</option>
-                                        <option value="6">24pt</option>
-                                        <option value="7">36pt</option>
-                                    </select>
-                                    
-                                    <select class="toolbar-select" data-command="fontName" title="Font Family">
-                                        <option value="Arial">Arial</option>
-                                        <option value="Georgia" selected>Georgia</option>
-                                        <option value="Times New Roman">Times New Roman</option>
-                                        <option value="Helvetica">Helvetica</option>
-                                        <option value="Verdana">Verdana</option>
-                                        <option value="Trebuchet MS">Trebuchet MS</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="toolbar-group">
-                                    <button type="button" class="toolbar-btn" data-command="justifyLeft" title="Align Left">
-                                        <i class="fas fa-align-left"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="justifyCenter" title="Align Center">
-                                        <i class="fas fa-align-center"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="justifyRight" title="Align Right">
-                                        <i class="fas fa-align-right"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="justifyFull" title="Justify">
-                                        <i class="fas fa-align-justify"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="toolbar-group">
-                                    <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Bullet List">
-                                        <i class="fas fa-list-ul"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="insertOrderedList" title="Numbered List">
-                                        <i class="fas fa-list-ol"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="indent" title="Indent">
-                                        <i class="fas fa-indent"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="outdent" title="Outdent">
-                                        <i class="fas fa-outdent"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="toolbar-group">
-                                    <input type="color" class="color-picker" data-command="foreColor" title="Text Color" value="#000000">
-                                    <input type="color" class="color-picker" data-command="hiliteColor" title="Highlight Color" value="#ffff00">
-                                </div>
-                                
-                                <div class="toolbar-group">
-                                    <button type="button" class="toolbar-btn" data-command="removeFormat" title="Clear Formatting">
-                                        <i class="fas fa-remove-format"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="undo" title="Undo">
-                                        <i class="fas fa-undo"></i>
-                                    </button>
-                                    <button type="button" class="toolbar-btn" data-command="redo" title="Redo">
-                                        <i class="fas fa-redo"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="rich-editor" id="devotion-content" contenteditable="true" placeholder="Write the complete devotional content with rich formatting..."></div>
-                            <textarea id="devotion-content-hidden" name="devotion_content" style="display: none;" required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-prayer">Closing Prayer (Optional)</label>
-                            <textarea class="form-control" name="devotion_prayer" id="devotion-prayer" rows="3" placeholder="Add a closing prayer..."></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="devotion-tags">Tags (comma-separated)</label>
-                            <input type="text" class="form-control" name="devotion_tags" id="devotion-tags" placeholder="faith, prayer, hope, love">
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-globe"></i> Publish to Live Website
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <span>All Devotionals</span>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" placeholder="Search...">
+                            <button class="btn btn-outline-secondary" type="button">
+                                <i class="fas fa-search"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="previewDevotion()">
-                                <i class="fas fa-eye"></i> Preview
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Cover</th>
+                                        <th>Title</th>
+                                        <th>Date</th>
+                                        <th>Excerpt</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($devotions)): ?>
+                                        <?php foreach ($devotions as $row): ?>
+                                            <tr>
+                                                <td>
+                                                    <img src="<?= htmlspecialchars($row['image'] ?? 'default-image.jpg') ?>"
+                                                        style="width:50px; height:50px; object-fit:cover;" alt="Cover">
+                                                </td>
+                                                <td><?= htmlspecialchars($row['title'] ?? '') ?></td>
+                                                <td><?= date("F j, Y", strtotime($row['devotion_date'])) ?></td>
+                                                <td><?= htmlspecialchars($row['excerpt'] ?? '') ?></td>
+                                                <td>
+                                                    <a href="Edevotional.php?id=<?= $row['id'] ?>"
+                                                        class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <form method="POST" action="delete_devotional.php" style="display:inline;">
+                                                        <input type="hidden" name="id" value="<?= $row['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure?')">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4">No devotionals found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <nav aria-label="Page navigation" class="mt-3">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $page - 1 ?>">Previous</a>
+                                </li>
+                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                    <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                    </li>
+                                <?php endfor; ?>
+                                <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $page + 1 ?>">Next</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prayer Requests Page -->
+        <div class="page-content" id="prayer-requests-page">
+            <div class="container-fluid">
+                <h4 class="mb-4">Prayer Requests</h4>
+                <?php if (isset($_SESSION['success_message'])): ?>
+                    <div class="alert alert-success"><?= $_SESSION['success_message'] ?></div>
+                    <?php unset($_SESSION['success_message']); ?>
+                <?php endif; ?>
+                <?php if (isset($_SESSION['error_message'])): ?>
+                    <div class="alert alert-danger"><?= $_SESSION['error_message'] ?></div>
+                    <?php unset($_SESSION['error_message']); ?>
+                <?php endif; ?>
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <span>All Prayer Requests</span>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" placeholder="Search..." id="prayerSearch">
+                            <button class="btn btn-outline-secondary" type="button" id="searchPrayer">
+                                <i class="fas fa-search"></i>
                             </button>
-                                <a href="manage_devotions.php?id=1" class="btn btn-primary btn-lg">
-                                <i class="fas fa-edit"></i>
-                                Edit Page
-                                </a>
-
-                            <small class="form-text text-muted">
-                                <i class="fas fa-info-circle"></i> 
-                                This will immediately update the live website and save to database
-                            </small>
                         </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Family Resources Management -->
-            <div class="page-section" id="family-resources">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-upload"></i>
-                        Upload New Resource
-                    </h4>
-                    <form id="resource-form" action="family_resources.php" method="POST" enctype="multipart/form-data">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="resource-name">Resource Name</label>
-                                    <input type="text" name="name" class="form-control" id="resource-name" placeholder="Enter resource name" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="resource-category">Category</label>
-                                    <select class="form-control"  name="category"  id="resource-category" required>
-                                        <option value="">Select Category</option>
-                                        <option value="children">Children</option>
-                                        <option value="teens">Teens</option>
-                                        <option value="young-adults">Young Adults</option>
-                                        <option value="couples">Couples</option>
-                                        <option value="parents">Parents</option>
-                                        <option value="seniors">Seniors</option>
-                                        <option value="general">General</option>
-                                    </select>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="prayerTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Request</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($prayerRequests)): ?>
+                                        <?php foreach ($prayerRequests as $request): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($request['name']) ?></td>
+                                                <td><?= htmlspecialchars($request['email']) ?></td>
+                                                <td><?= htmlspecialchars($request['title']) ?></td>
+                                                <td><?= date('M j, Y g:i a', strtotime($request['created_at'])) ?></td>
+                                                <td>
+                                                    <form action="delete_prayer_request.php" method="POST"
+                                                        style="display:inline;">
+                                                        <input type="hidden" name="id"
+                                                            value="<?= isset($request['id']) ? (int) $request['id'] : '' ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure you want to delete this prayer request?')">
+                                                            <i class="fas fa-trash"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4">No prayer requests found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
                         </div>
-
-                        <div class="form-group">
-                            <label for="resource-description">Description</label>
-                            <textarea class="form-control" name="description" id="resource-description" rows="3" placeholder="Describe this resource..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="resource-thumbnail">Thumbnail Image</label>
-                            <input type="file" class="form-control" name="thumbnail" id="resource-thumbnail" accept="image/*" required>
-                            <img id="thumbnail-preview" class="image-preview" style="display:none;">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="resource-file">Resource File (PDF, DOC, etc.)</label>
-                            <div class="file-upload-area" id="file-drop-area" style="cursor:pointer;">
-                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                            <p>Drag and drop your file here or click to select</p>
-                            <input type="file" class="form-control" name="resource_file" id="resource-file" accept=".pdf,.doc,.docx,.txt" required style="display:none;">
-                        </div>
-                            <div id="file-info" style="display:none;" class="mt-2">
-                                <small class="text-muted">Selected: <span id="file-name"></span></small>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-upload"></i> Upload Resource
-                        </button>
-                    </form>
-                </div>
-
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-list"></i>
-                        Uploaded Resources
-                    </h4>
-                    <div class="resources-grid" id="resources-grid">
-                        <!-- Resources will be populated here -->
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Past Devotions Archive -->
-            <div class="page-section" id="past-devotions">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-history"></i>
-                        Past Devotions Archive
-                    </h4>
-                    
-                    <div class="row mb-4">
-                        <div class="col-md-4">
-                            <select class="form-control" id="filter-month">
-                                <option value="">All Months</option>
-                                <option value="01">January</option>
-                                <option value="02">February</option>
-                                <option value="03">March</option>
-                                <option value="04">April</option>
-                                <option value="05">May</option>
-                                <option value="06">June</option>
-                                <option value="07">July</option>
-                                <option value="08">August</option>
-                                <option value="09">September</option>
-                                <option value="10">October</option>
-                                <option value="11">November</option>
-                                <option value="12">December</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <select class="form-control" id="filter-year">
-                                <option value="">All Years</option>
-                                <option value="2025">2025</option>
-                                <option value="2024">2024</option>
-                                <option value="2023">2023</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <input type="text" class="form-control" id="search-topic" placeholder="Search by topic...">
+        <!-- Testimonies Page -->
+        <div class="page-content" id="testimonies-page">
+            <div class="container-fluid">
+                <h4 class="mb-4">Testimonies</h4>
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <span>All Testimonies</span>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" placeholder="Search..." id="testimonySearch">
+                            <button class="btn btn-outline-secondary" type="button" id="searchTestimony">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
                     </div>
-
-                    <div class="devotions-list" id="past-devotions-list">
-                        <!-- Past devotions will be populated here -->
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="testimonyTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Initials</th>
+                                        <th>Testimony</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($testimonies)): ?>
+                                        <?php foreach ($testimonies as $testimony): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($testimony['name']) ?></td>
+                                                <td><?= htmlspecialchars($testimony['initials']) ?></td>
+                                                <td><?= htmlspecialchars($testimony['message']) ?></td>
+                                                <td><?= date('M j, Y g:i a', strtotime($testimony['date'])) ?></td>
+                                                <td>
+                                                    <?php $statusClass = [
+                                                        'pending' => 'bg-warning',
+                                                        'approved' => 'bg-success',
+                                                        'rejected' => 'bg-danger'
+                                                    ][$testimony['status']] ?? 'bg-secondary'; ?>
+                                                    <span class="badge <?= $statusClass ?>">
+                                                        <?= ucfirst($testimony['status']) ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <?php if ($testimony['status'] === 'pending'): ?>
+                                                        <form action="approve_testimony.php" method="POST" style="display:inline;">
+                                                            <input type="hidden" name="id" value="<?= $testimony['id'] ?>">
+                                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                    <form action="delete_testimony.php" method="GET" style="display:inline;">
+                                                        <input type="hidden" name="id" value="<?= $testimony['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure?')">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4">No testimonies found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+        <!-- Comments Page -->
+        <div class="page-content" id="comments-page">
+            <div class="container-fluid">
+                <h4 class="mb-4">Manage Comments</h4>
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <span>All Comments</span>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" placeholder="Search..." id="commentSearch">
+                            <button class="btn btn-outline-secondary" type="button" id="searchComment">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="commentTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Comment</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
 
-            <!-- Prayer Requests -->
-            <div class="page-section" id="prayer-requests">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-pray"></i>
-                        Prayer Requests Management
-                    </h4>
-                    <div class="devotions-list" id="prayer-requests-list">
-                        <!-- Prayer requests will be populated here -->
+
+
+                                    <?php if (!empty($comments)): ?>
+                                        <?php foreach ($comments as $comment): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($comment['id']) ?></td>
+                                                <td><?= htmlspecialchars($comment['name']) ?></td>
+                                                <td><?= htmlspecialchars($comment['comment']) ?></td>
+                                                <td><?= date('M j, Y g:i a', strtotime($comment['created_at'])) ?></td>
+                                                <td>
+                                                    <form action="delete_comment.php" method="POST" style="display:inline;">
+                                                        <input type="hidden" name="id" value="<?= $comment['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure you want to delete this comment?')">
+                                                            <i class="fas fa-trash"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4">No comments found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Settings -->
-            <div class="page-section" id="settings">
-                <div class="section-card">
-                    <h4 class="section-title">
-                        <i class="fas fa-cog"></i>
-                        Website Settings
-                    </h4>
-                    <form id="settings-form">
-                        <div class="form-group">
-                            <label for="site-title">Website Title</label>
-                            <input type="text" class="form-control" id="site-title" value="The Anchor Devotional">
+        <!-- Subscribers Page -->
+        <div class="page-content" id="subscribers-page">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4>Subscribers</h4>
+                    <button class="btn btn-primary">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <span>All Subscribers</span>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" placeholder="Search..." id="subscriberSearch">
+                            <button class="btn btn-outline-secondary" type="button" id="searchSubscriber">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
-
-                        <div class="form-group">
-                            <label for="site-description">Website Description</label>
-                            <textarea class="form-control" id="site-description" rows="3">Daily spiritual nourishment and biblical wisdom for believers.</textarea>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="subscriberTable">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($subscribers)): ?>
+                                        <?php foreach ($subscribers as $subscriber): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($subscriber['email']) ?></td>
+                                                <td><?= date('M j, Y', strtotime($subscriber['subscribed_at'])) ?></td>
+                                                <td>
+                                                    <span
+                                                        class="badge <?= $subscriber['status'] === 'Active' ? 'bg-success' : 'bg-secondary' ?>">
+                                                        <?= htmlspecialchars($subscriber['status']) ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <a href="mailto:<?= htmlspecialchars($subscriber['email']) ?>"
+                                                        class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-envelope"></i>
+                                                    </a>
+                                                    <form action="delete_subscriber.php" method="POST" style="display:inline;">
+                                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure?')">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4">No subscribers found.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
                         </div>
-
-                        <div class="form-group">
-                            <label for="admin-email">Admin Email</label>
-                            <input type="email" class="form-control" id="admin-email" value="pastor@theanchor.com">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="contact-phone">Contact Phone</label>
-                            <input type="tel" class="form-control" id="contact-phone" value="+234 812 345 6789">
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Save Settings
-                        </button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Initialize Dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeDashboard();
-            loadStoredData();
-            syncPrayerRequests();
-            initializeRichTextEditor();
-            initializeMobileMenu();
-        });
-
-        // Mobile Menu Functions
-        function initializeMobileMenu() {
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-            const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-
-            // Mobile menu toggle
-            if (mobileMenuBtn) {
-                mobileMenuBtn.addEventListener('click', function() {
-                    sidebar.classList.toggle('active');
-                    overlay.classList.toggle('active');
-                });
-            }
-
-            // Close mobile menu when overlay is clicked
-            if (overlay) {
-                overlay.addEventListener('click', function() {
-                    sidebar.classList.remove('active');
-                    overlay.classList.remove('active');
-                });
-            }
-
-            // Close mobile menu when a link is clicked
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function() {
-                    if (window.innerWidth <= 768) {
-                        sidebar.classList.remove('active');
-                        overlay.classList.remove('active');
-                    }
-                });
-            });
-
-            // Handle window resize
-            window.addEventListener('resize', function() {
-                if (window.innerWidth > 768) {
-                    sidebar.classList.remove('active');
-                    overlay.classList.remove('active');
-                }
-            });
-
-            // Handle escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && sidebar.classList.contains('active')) {
-                    sidebar.classList.remove('active');
-                    overlay.classList.remove('active');
-                }
-            });
-        }
-
-        // Rich Text Editor Functions
-        function initializeRichTextEditor() {
-            const editor = document.getElementById('devotion-content');
-            const toolbar = document.getElementById('editor-toolbar');
-            const hiddenTextarea = document.getElementById('devotion-content-hidden');
-
-            // Enable design mode for contenteditable
-            editor.addEventListener('focus', function() {
-                document.execCommand('defaultParagraphSeparator', false, 'p');
-            });
-
-            // Toolbar button event listeners
-            toolbar.addEventListener('click', function(e) {
-                if (e.target.classList.contains('toolbar-btn') || e.target.parentElement.classList.contains('toolbar-btn')) {
-                    e.preventDefault();
-                    const button = e.target.classList.contains('toolbar-btn') ? e.target : e.target.parentElement;
-                    const command = button.getAttribute('data-command');
-                    
-                    executeCommand(command);
-                    updateToolbarState();
-                    editor.focus();
-                }
-            });
-
-            // Handle select dropdowns
-            toolbar.addEventListener('change', function(e) {
-                if (e.target.classList.contains('toolbar-select')) {
-                    const command = e.target.getAttribute('data-command');
-                    const value = e.target.value;
-                    executeCommand(command, value);
-                    editor.focus();
-                }
-            });
-
-            // Handle color pickers
-            toolbar.addEventListener('change', function(e) {
-                if (e.target.classList.contains('color-picker')) {
-                    const command = e.target.getAttribute('data-command');
-                    const color = e.target.value;
-                    executeCommand(command, color);
-                    editor.focus();
-                }
-            });
-
-            // Update toolbar state on selection change
-            editor.addEventListener('keyup', updateToolbarState);
-            editor.addEventListener('mouseup', updateToolbarState);
-
-            // Sync content with hidden textarea for form submission
-            editor.addEventListener('input', function() {
-                hiddenTextarea.value = editor.innerHTML;
-            });
-
-            // Handle keyboard shortcuts
-            editor.addEventListener('keydown', function(e) {
-                if (e.ctrlKey || e.metaKey) {
-                    switch(e.key.toLowerCase()) {
-                        case 'b':
-                            e.preventDefault();
-                            executeCommand('bold');
-                            break;
-                        case 'i':
-                            e.preventDefault();
-                            executeCommand('italic');
-                            break;
-                        case 'u':
-                            e.preventDefault();
-                            executeCommand('underline');
-                            break;
-                        case 'z':
-                            e.preventDefault();
-                            executeCommand('undo');
-                            break;
-                        case 'y':
-                            e.preventDefault();
-                            executeCommand('redo');
-                            break;
-                    }
-                }
-            });
-        }
-
-        function executeCommand(command, value = null) {
-            document.execCommand(command, false, value);
-        }
-
-        function updateToolbarState() {
-            const buttons = document.querySelectorAll('.toolbar-btn');
-            const selects = document.querySelectorAll('.toolbar-select');
-
-            buttons.forEach(button => {
-                const command = button.getAttribute('data-command');
-                if (document.queryCommandState(command)) {
-                    button.classList.add('active');
-                } else {
-                    button.classList.remove('active');
-                }
-            });
-
-            selects.forEach(select => {
-                const command = select.getAttribute('data-command');
-                const value = document.queryCommandValue(command);
-                
-                if (command === 'fontSize') {
-                    select.value = value || '3';
-                } else if (command === 'fontName') {
-                    select.value = value.replace(/['"]/g, '') || 'Georgia';
-                }
-            });
-        }
-
-        // Sync prayer requests from website forms
-        function syncPrayerRequests() {
-            const websitePrayers = JSON.parse(localStorage.getItem('prayerRequests') || '[]');
-            const dashboardPrayers = getFromStorage('prayers') || [];
-            
-            // Add new prayers from website to dashboard
-            websitePrayers.forEach(prayer => {
-                if (!dashboardPrayers.find(p => p.id === prayer.id)) {
-                    dashboardPrayers.push(prayer);
-                }
-            });
-            
-            if (dashboardPrayers.length > 0) {
-                saveToStorage('prayers', dashboardPrayers);
-            }
-        }
-
-        // Navigation
-        function initializeDashboard() {
-            const navLinks = document.querySelectorAll('.nav-link');
-            const sections = document.querySelectorAll('.page-section');
-            const breadcrumb = document.getElementById('breadcrumb-text');
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const targetPage = this.getAttribute('data-page');
-                    if (!targetPage) return;
-
-                    // Update active nav link
-                    navLinks.forEach(nav => nav.classList.remove('active'));
-                    this.classList.add('active');
-
-                    // Show target section
-                    sections.forEach(section => section.classList.remove('active'));
-                    const targetSection = document.getElementById(targetPage);
-                    if (targetSection) {
-                        targetSection.classList.add('active');
-                        breadcrumb.textContent = this.textContent.trim();
-                    }
-                });
-            });
-
-            // Mobile sidebar toggle
+        document.addEventListener('DOMContentLoaded', function () {
+            // Sidebar toggle
             const sidebarToggle = document.getElementById('sidebarToggle');
             const sidebar = document.getElementById('sidebar');
-            
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', () => {
-                    sidebar.classList.toggle('active');
+            const mainContent = document.getElementById('main-content');
+
+            sidebarToggle.addEventListener('click', function () {
+                sidebar.classList.toggle('active');
+                mainContent.classList.toggle('active');
+            });
+
+            // Page navigation
+            const menuLinks = document.querySelectorAll('.sidebar-menu a[data-page]');
+            menuLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    // Remove active class from all links
+                    menuLinks.forEach(item => item.classList.remove('active'));
+
+                    // Add active to clicked link
+                    this.classList.add('active');
+
+                    // Hide all pages
+                    document.querySelectorAll('.page-content').forEach(page => {
+                        page.classList.remove('active');
+                    });
+
+                    // Show selected page
+                    const pageId = this.getAttribute('data-page') + '-page';
+                    document.getElementById(pageId).classList.add('active');
                 });
-            }
-        }
-
-        // Data Storage Functions
-        function saveToStorage(key, data) {
-            localStorage.setItem('anchor_' + key, JSON.stringify(data));
-        }
-
-        function getFromStorage(key) {
-            const data = localStorage.getItem('anchor_' + key);
-            return data ? JSON.parse(data) : null;
-        }
-
-        function loadStoredData() {
-            // Load existing devotions
-            const devotions = getFromStorage('devotions') || [];
-            const resources = getFromStorage('resources') || [];
-            const prayers = getFromStorage('prayers') || [];
-
-            // Update stats
-            // document.getElementById('total-devotions').textContent = devotions.length;
-            // document.getElementById('total-resources').textContent = resources.length;
-            // document.getElementById('total-prayers').textContent = prayers.length;
-
-            // Populate lists
-            populatePastDevotions(devotions);
-            populateResources(resources);
-            populatePrayerRequests(prayers);
-        }
-
-        // Landing Page Form
-        document.getElementById('landing-page-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = {
-                introTitle: document.getElementById('intro-title').value,
-                introSubtitle: document.getElementById('intro-subtitle').value,
-                introDescription: document.getElementById('intro-description').value,
-                featuredTopic: document.getElementById('featured-topic').value,
-                featuredDate: document.getElementById('featured-date').value,
-                featuredIntro: document.getElementById('featured-intro').value,
-                verseOfDay: document.getElementById('verse-of-day').value,
-                verseReference: document.getElementById('verse-reference').value,
-                timestamp: new Date().toISOString()
-            };
-
-            saveToStorage('landing_page', formData);
-            showAlert('success', 'Landing page content updated successfully!');
-        });
-
-        // Today's Devotion Form
-        document.getElementById('devotion-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const devotions = getFromStorage('devotions') || [];
-            const newDevotion = {
-                id: Date.now(),
-                topic: document.getElementById('devotion-topic').value,
-                date: document.getElementById('devotion-date').value,
-                verse: document.getElementById('devotion-verse').value,
-                intro: document.getElementById('devotion-intro').value,
-                content: document.getElementById('devotion-content').value,
-                prayer: document.getElementById('devotion-prayer').value,
-                tags: document.getElementById('devotion-tags').value.split(',').map(tag => tag.trim()),
-                timestamp: new Date().toISOString()
-            };
-
-            devotions.unshift(newDevotion);
-            saveToStorage('devotions', devotions);
-            
-            this.reset();
-            showAlert('success', 'Devotion published successfully!');
-            loadStoredData();
-        });
-
-        // Resource Upload Form
-        document.getElementById('resource-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const resources = getFromStorage('resources') || [];
-            const newResource = {
-                id: Date.now(),
-                name: document.getElementById('resource-name').value,
-                category: document.getElementById('resource-category').value,
-                description: document.getElementById('resource-description').value,
-                filename: document.getElementById('file-name').textContent,
-                timestamp: new Date().toISOString()
-            };
-
-            resources.unshift(newResource);
-            saveToStorage('resources', newResource);
-            
-            this.reset();
-            document.getElementById('file-info').style.display = 'none';
-            showAlert('success', 'Resource uploaded successfully!');
-            loadStoredData();
-        });
-
-        // File Upload Handling
-        const fileDropArea = document.getElementById('file-drop-area');
-        const fileInput = document.getElementById('resource-file');
-        const fileInfo = document.getElementById('file-info');
-        const fileName = document.getElementById('file-name');
-
-        fileDropArea.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', function() {
-            if (this.files.length > 0) {
-                fileName.textContent = this.files[0].name;
-                fileInfo.style.display = 'block';
-            }
-        });
-
-        // Image Preview Functions
-        function setupImagePreview(inputId, previewId) {
-            const input = document.getElementById(inputId);
-            const preview = document.getElementById(previewId);
-            
-            input.addEventListener('change', function() {
-                const file = this.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        preview.src = e.target.result;
-                        preview.style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                }
             });
-        }
 
-        setupImagePreview('cover-image', 'cover-preview');
-        setupImagePreview('devotion-image', 'devotion-preview');
-        setupImagePreview('resource-thumbnail', 'thumbnail-preview');
+            // Simple search functionality
+            function setupSearch(inputId, tableId) {
+                const searchInput = document.getElementById(inputId);
+                const table = document.getElementById(tableId);
 
-        // Populate Functions
-        function populatePastDevotions(devotions) {
-            const container = document.getElementById('past-devotions-list');
-            if (!devotions.length) {
-                container.innerHTML = '<p class="text-muted p-4">No devotions published yet.</p>';
-                return;
-            }
+                if (searchInput && table) {
+                    searchInput.addEventListener('input', function () {
+                        const searchTerm = this.value.toLowerCase();
+                        const rows = table.querySelectorAll('tbody tr');
 
-            container.innerHTML = devotions.map(devotion => `
-                <div class="devotion-item">
-                    <div class="devotion-info">
-                        <h6>${devotion.topic}</h6>
-                        <small>${formatDate(devotion.date)} • ${devotion.tags.join(', ')}</small>
-                    </div>
-                    <div class="devotion-actions">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editDevotion(${devotion.id})">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteDevotion(${devotion.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function populateResources(resources) {
-            const container = document.getElementById('resources-grid');
-            if (!resources.length) {
-                container.innerHTML = '<p class="text-muted">No resources uploaded yet.</p>';
-                return;
-            }
-
-            container.innerHTML = resources.map(resource => `
-                <div class="resource-card">
-                    <div class="resource-info">
-                        <div class="resource-name">${resource.name}</div>
-                        <small class="text-muted">${resource.category} • ${formatDate(resource.timestamp)}</small>
-                        <p class="mt-2">${resource.description}</p>
-                        <div class="resource-actions">
-                            <button class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-download"></i> Download
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteResource(${resource.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function populatePrayerRequests(prayers) {
-            const container = document.getElementById('prayer-requests-list');
-            if (!prayers.length) {
-                container.innerHTML = '<p class="text-muted p-4">No prayer requests yet.</p>';
-                return;
-            }
-
-            container.innerHTML = prayers.map(prayer => `
-                <div class="devotion-item">
-                    <div class="devotion-info">
-                        <h6>${prayer.name}</h6>
-                        <p class="mb-1">${prayer.request}</p>
-                        <small>${formatDate(prayer.timestamp)}</small>
-                    </div>
-                    <div class="devotion-actions">
-                        <button class="btn btn-sm btn-success">
-                            <i class="fas fa-check"></i> Prayed
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deletePrayer('${prayer.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Utility Functions
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        }
-
-        function showAlert(type, message) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            document.querySelector('.content-area').insertBefore(alertDiv, document.querySelector('.content-area').firstChild);
-            
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
-                }
-            }, 5000);
-        }
-
-        function deleteDevotion(id) {
-            if (confirm('Are you sure you want to delete this devotion?')) {
-                let devotions = getFromStorage('devotions') || [];
-                devotions = devotions.filter(d => d.id !== id);
-                saveToStorage('devotions', devotions);
-                loadStoredData();
-                showAlert('success', 'Devotion deleted successfully!');
-            }
-        }
-
-        function deleteResource(id) {
-            if (confirm('Are you sure you want to delete this resource?')) {
-                let resources = getFromStorage('resources') || [];
-                resources = resources.filter(r => r.id !== id);
-                saveToStorage('resources', resources);
-                loadStoredData();
-                showAlert('success', 'Resource deleted successfully!');
-            }
-        }
-
-        function deletePrayer(id) {
-            if (confirm('Are you sure you want to delete this prayer request?')) {
-                let prayers = getFromStorage('prayers') || [];
-                prayers = prayers.filter(p => p.id !== id);
-                saveToStorage('prayers', prayers);
-                loadStoredData();
-                showAlert('success', 'Prayer request deleted successfully!');
-            }
-        }
-
-        // Set today's date as default
-        document.getElementById('devotion-date').value = new Date().toISOString().split('T')[0];
-        document.getElementById('featured-date').value = new Date().toISOString().split('T')[0];
-
-        // Dashboard Authentication & Initialization
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check authentication
-            if (!anchorAuth.isAuthenticated()) {
-                // Redirect to home page if not authenticated
-                window.location.href = 'index.html';
-                return;
-            }
-
-            // Update welcome message with actual user info
-            const user = anchorAuth.getCurrentUser();
-            if (user) {
-                const welcomeElement = document.getElementById('user-welcome');
-                if (welcomeElement) {
-                    welcomeElement.textContent = `Welcome, ${user.full_name || user.username}`;
+                        rows.forEach(row => {
+                            const text = row.textContent.toLowerCase();
+                            row.style.display = text.includes(searchTerm) ? '' : 'none';
+                        });
+                    });
                 }
             }
 
-            // Initialize dashboard data
-            loadStoredData();
-            
-            // Set up periodic refresh for real-time updates
-            setInterval(loadStoredData, 30000); // Refresh every 30 seconds
+            // Initialize search for all tables
+            setupSearch('prayerSearch', 'prayerTable');
+            setupSearch('testimonySearch', 'testimonyTable');
+            setupSearch('subscriberSearch', 'subscriberTable');
         });
 
-        // Add logout confirmation
-        window.addEventListener('beforeunload', function() {
-            // Optional: Save any unsaved changes
-            // This runs when user closes the tab/window
-        });
-
-        // Real-time Website Update Functions
-        function previewDevotion() {
-            const title = document.getElementById('devotion-topic')?.value || 'Preview Title';
-            const verse = document.getElementById('devotion-verse')?.value || 'Sample verse content';
-            const verseRef = document.getElementById('verse-reference')?.value || 'Reference';
-            const content = document.getElementById('devotion-content')?.innerHTML || 'Sample content';
-            
-            const previewWindow = window.open('', 'devotion-preview', 'width=800,height=600,scrollbars=yes');
-            previewWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Devotion Preview</title>
-                    <style>
-                        body { font-family: Georgia, serif; max-width: 600px; margin: 50px auto; padding: 20px; line-height: 1.6; }
-                        .devotion-title { color: #ad3128; border-bottom: 2px solid #ad3128; padding-bottom: 10px; }
-                        .scripture-verse { background: #f8f9fa; padding: 20px; border-left: 4px solid #ad3128; margin: 20px 0; }
-                        .devotion-content { margin: 20px 0; }
-                        .preview-badge { position: fixed; top: 10px; right: 10px; background: #ffc107; color: #000; padding: 5px 10px; border-radius: 4px; font-size: 12px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="preview-badge">PREVIEW MODE</div>
-                    <h1 class="devotion-title">${title}</h1>
-                    <p class="devotion-date">${new Date().toLocaleDateString('en-US', { 
-                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-                    })}</p>
-                    <blockquote class="scripture-verse">
-                        <p><strong>"${verse}"</strong></p>
-                        <footer><cite>- ${verseRef}</cite></footer>
-                    </blockquote>
-                    <div class="devotion-content">${content}</div>
-                </body>
-                </html>
-            `);
-            previewWindow.document.close();
-        }
-
-        function showLiveUpdateStatus(message, type = 'info') {
-            // Remove existing status
-            const existing = document.querySelector('.update-status');
-            if (existing) existing.remove();
-
-            // Create new status
-            const statusDiv = document.createElement('div');
-            statusDiv.className = 'update-status';
-            statusDiv.innerHTML = `
-                <div class="alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
-                    ${message}
-                    <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
-                </div>
-            `;
-            
-            document.body.appendChild(statusDiv);
-            
-            // Auto remove after 5 seconds
-            setTimeout(() => {
-                if (statusDiv.parentElement) {
-                    statusDiv.remove();
-                }
-            }, 5000);
-        }
-
-        // Add live update indicators to forms
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add live indicators to forms
-            const forms = ['devotion-form', 'homepage-form'];
-            forms.forEach(formId => {
-                const form = document.getElementById(formId);
-                if (form) {
-                    const indicator = document.createElement('div');
-                    indicator.className = 'live-update-indicator';
-                    indicator.innerHTML = '<span>Live Website Updates Enabled</span>';
-                    form.appendChild(indicator);
-                }
-            });
-        });
-
-        // Copy content to hidden textarea on submit
-document.getElementById('devotion-form').addEventListener('submit', function () {
-    document.getElementById('devotion-content-hidden').value =
-        document.getElementById('devotion-content').innerHTML;
-});
-
-// Ensure Enter inserts <p> tags
-const editor = document.getElementById('devotion-content');
-editor.addEventListener('focus', function() {
-    document.execCommand('defaultParagraphSeparator', false, 'p');
-});
-
-// Toolbar button functionality
-document.querySelectorAll('#editor-toolbar .toolbar-btn').forEach(button => {
-    button.addEventListener('click', () => {
-        const command = button.dataset.command;
-        document.execCommand(command, false, null);
-        editor.focus();
-    });
-});
-
-// Toolbar select elements (font size, font family)
-document.querySelectorAll('#editor-toolbar .toolbar-select').forEach(select => {
-    select.addEventListener('change', () => {
-        const command = select.dataset.command;
-        const value = select.value;
-        document.execCommand(command, false, value);
-        editor.focus();
-    });
-});
-
-// Color pickers
-document.querySelectorAll('#editor-toolbar .color-picker').forEach(input => {
-    input.addEventListener('change', () => {
-        const command = input.dataset.command;
-        const value = input.value;
-        document.execCommand(command, false, value);
-        editor.focus();
-    });
-});
-
-function logout() {
-    if (anchorAuth && anchorAuth.logout) {
-        anchorAuth.logout(); // Perform logout
-
-        // After logout, redirect to login page
-        setTimeout(() => {
-            window.location.href = 'login.php';
-        }, 500); // wait a short time to ensure logout
-    } else {
-        // fallback
-        window.location.href = 'login.php';
-    }
-}
-
-
-
-        
+        setupSearch('commentSearch', 'commentTable');
     </script>
 </body>
+
 </html>
