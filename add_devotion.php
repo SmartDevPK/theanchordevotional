@@ -1,5 +1,5 @@
 <?php
-include("db.php"); // $mysqli connection
+include("db.php");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $topic = $_POST['topic'];
@@ -19,47 +19,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         move_uploaded_file($_FILES['devotion_image']['tmp_name'], $devotion_image);
     }
 
-    $stmt = $mysqli->prepare("
-        INSERT INTO devotions 
-        (topic, devotion_date, devotion_image, devotion_verse, verse_reference, devotion_intro, devotion_content, devotion_prayer, devotion_tags) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    $stmt->bind_param(
-        "sssssssss",
-        $topic,
-        $devotion_date,
-        $devotion_image,
-        $devotion_verse,
-        $verse_reference,
-        $devotion_intro,
-        $devotion_content,
-        $devotion_prayer,
-        $devotion_tags
-    );
+    // Check if a devotion already exists
+    $result = $mysqli->query("SELECT id, devotion_image FROM devotions LIMIT 1");
+    if ($result->num_rows > 0) {
+        // Update the existing devotion
+        $row = $result->fetch_assoc();
+        $id = $row['id'];
+
+        // Keep old image if no new image uploaded
+        if (!$devotion_image) {
+            $devotion_image = $row['devotion_image'];
+        }
+
+        $stmt = $mysqli->prepare("
+            UPDATE devotions 
+            SET topic=?, devotion_date=?, devotion_image=?, devotion_verse=?, verse_reference=?, devotion_intro=?, devotion_content=?, devotion_prayer=?, devotion_tags=? 
+            WHERE id=?
+        ");
+        $stmt->bind_param(
+            "sssssssssi",
+            $topic,
+            $devotion_date,
+            $devotion_image,
+            $devotion_verse,
+            $verse_reference,
+            $devotion_intro,
+            $devotion_content,
+            $devotion_prayer,
+            $devotion_tags,
+            $id
+        );
+        $action = "updated";
+    } else {
+        // Insert new devotion
+        $stmt = $mysqli->prepare("
+            INSERT INTO devotions 
+            (topic, devotion_date, devotion_image, devotion_verse, verse_reference, devotion_intro, devotion_content, devotion_prayer, devotion_tags) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param(
+            "sssssssss",
+            $topic,
+            $devotion_date,
+            $devotion_image,
+            $devotion_verse,
+            $verse_reference,
+            $devotion_intro,
+            $devotion_content,
+            $devotion_prayer,
+            $devotion_tags
+        );
+        $action = "added";
+    }
 
     if ($stmt->execute()) {
-    // success alert
-    echo "<script>
-            alert('Homepage updated successfully!');
-            window.location.href = 'dashboard.php'; 
-          </script>";
-} else {
-    // error alert
-    $error = addslashes($mysqli->error); 
-    echo "<script>
-            alert('Error updating homepage: $error');
-            window.history.back(); 
-          </script>";
-}
+        echo "<script>
+                alert('Devotion $action successfully!');
+                window.location.href = 'dashboard.php'; 
+              </script>";
+    } else {
+        $error = addslashes($mysqli->error); 
+        echo "<script>
+                alert('Error: $error');
+                window.history.back(); 
+              </script>";
+    }
 }
 
+// Fetch the single devotion for editing/viewing
 $devotion = [];
-if (isset($_GET['id'])) {
-    $id = (int) $_GET['id'];
-    $stmt = $mysqli->prepare("SELECT * FROM devotions WHERE id=?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+$result = $mysqli->query("SELECT * FROM devotions LIMIT 1");
+if ($result->num_rows > 0) {
     $devotion = $result->fetch_assoc();
 }
 ?>

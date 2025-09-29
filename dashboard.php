@@ -1343,6 +1343,11 @@ include "admin_dashboards.php";
                             <button type="button" class="btn btn-outline-secondary" onclick="previewDevotion()">
                                 <i class="fas fa-eye"></i> Preview
                             </button>
+                                <a href="manage_devotions.php?id=1" class="btn btn-primary btn-lg">
+                                <i class="fas fa-edit"></i>
+                                Edit Page
+                                </a>
+
                             <small class="form-text text-muted">
                                 <i class="fas fa-info-circle"></i> 
                                 This will immediately update the live website and save to database
