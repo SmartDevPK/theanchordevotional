@@ -1,6 +1,8 @@
 <?php
 include "admin_dashboards.php";
 
+
+// Check if user is logged in
 session_start();
 
 // Check if the user is logged in
@@ -1067,13 +1069,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
                         <div class="stat-number" id="total-devotions">  <?php echo $approved_total; ?></div>
                         <div class="stat-label">Today Devotional</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon primary">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                        <div class="stat-number" id="total-devotions">  <?php echo $approved_verses_total; ?></div>
-                        <div class="stat-label">Daily Varse</div>
-                    </div>
+                    
                       <div class="stat-card">
                         <div class="stat-icon primary">
                             <i class="fas fa-book-open"></i>

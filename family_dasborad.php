@@ -1,3 +1,16 @@
+<?php
+
+session_start();
+
+// Check if the user is logged in
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+    // Redirect to login page if not logged in
+    header("Location: login.php");
+    exit();
+}
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -88,6 +101,10 @@
                                 <i class="fas fa-fw fa-tags me-2"></i>Categories
                             </a>
                         </li>
+                        <li class="nav-item mt-3">
+                            <a class="nav-link text-danger" href="dashboard.php">
+                                <i class="fas fa-fw fa-sign-out-alt me-2"></i>Return to Main Dashboard
+                            </a>
                     </ul>
                 </div>
             </div>

@@ -90,70 +90,7 @@ $conn->close();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     
-    <!-- Structured Data for Google -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "The Anchor Devotional",
-      "description": "Daily Christian devotional ministry providing spiritual nourishment through Bible study and prayer",
-      "url": "https://theanchordevotional.com",
-      "logo": "https://theanchordevotional.com/the anch logo.png",
-      "founder": {
-        "@type": "Person",
-        "name": "Maj Gen (Dr) Ezra Jahadi Jakko (Rtd)",
-        "jobTitle": "Pastor/General Overseer",
-        "worksFor": "Gospel Believers Mission"
-      },
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "telephone": "+234-812-345-6789",
-        "contactType": "customer service",
-        "email": "info@theanchor.com"
-      },
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "Abuja",
-        "addressCountry": "Nigeria"
-      },
-      "sameAs": [
-        "https://facebook.com/theanchordevotional",
-        "https://twitter.com/theanchordevotional",
-        "https://instagram.com/theanchordevotional",
-        "https://youtube.com/theanchordevotional"
-      ]
-    }
-    </script>
-    
-    <!-- Article Structured Data for Featured Devotion -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Article",
-      "headline": "Surviving the HEAT - Daily Devotional",
-      "description": "A powerful devotional about trusting in God during life's difficulties and challenges, based on Jeremiah 17:7-8.",
-      "author": {
-        "@type": "Person",
-        "name": "Maj Gen (Dr) Ezra Jahadi Jakko (Rtd)",
-        "jobTitle": "Pastor/General Overseer"
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "The Anchor Devotional",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://theanchordevotional.com/the anch logo.png"
-        }
-      },
-      "datePublished": "2025-06-05",
-      "dateModified": "2025-06-05",
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": "https://theanchordevotional.com"
-      },
-      "image": "https://theanchordevotional.com/Untitled design.png"
-    }
-    </script>
+ 
     <style>
         /* Global Variables and Reset */
         :root {
@@ -1261,9 +1198,7 @@ $conn->close();
                          alt="Devotional Cover" class="cover-image">
 
                     <div class="cover-content">
-                        <h2 class="cover-topic">
-                            <?= htmlspecialchars($landing['featured_topic'] ?? 'No Topic') ?>
-                        </h2>
+                
                         <h4 class="cover-subtitle">
                             <?= htmlspecialchars($landing['hero_subtitle'] ?? '') ?>
                         </h4>
