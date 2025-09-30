@@ -1,55 +1,39 @@
 <?php
-// Display errors for debugging
-ini_set('display_errors', 1);
 error_reporting(E_ALL);
+ini_set("display_errors", 1);
 
-include 'daily-verse.php';
 
-// DB connection params
 $host = "localhost";
 $port = 3307;
 $username = "root";
 $password = "";
 $database = "prayer_db";
 
-// Connect to DB
+// connect
 $conn = new mysqli($host, $username, $password, $database, $port);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Fetch latest devotion
-$result = $conn->query("SELECT * FROM devotion ORDER BY id DESC LIMIT 1");
-$devotion = $result ? $result->fetch_assoc() : null;
+// get latest record by updated_at
+$sql = "SELECT hero_title, hero_subtitle, hero_description, cover_image,
+               featured_topic, featured_date, featured_intro,
+               verse_of_day, verse_reference, updated_at
+        FROM landing_page_content
+        ORDER BY updated_at DESC
+        LIMIT 1";
 
-// Fetch today's devotion
-$results = $conn->query("SELECT * FROM today_Devotion ORDER BY id DESC LIMIT 1");
-$devotions = $results ? $results->fetch_assoc() : null;
+$result = $conn->query($sql);
 
-// Now it's safe to close
+// ensure $landing always exists (avoid undefined variable)
+$landing = null;
+if ($result) {
+    $landing = $result->num_rows ? $result->fetch_assoc() : null;
+} else {
+    error_log("Landing query failed: " . $conn->error); // log error for debugging
+}
+
 $conn->close();
-
-// Handle success/error messages
-$message = "";
-if (isset($_GET['success'])) {
-    switch ($_GET['success']) {
-        case 'submitted':
-            $message = "Thank you! Your testimony is pending approval.";
-            break;
-        case 'approved':
-            $message = "Testimony approved successfully!";
-            break;
-    }
-}
-
-if (isset($_GET['error'])) {
-    switch ($_GET['error']) {
-        case 'empty_fields':
-            $message = "Please fill all required fields.";
-            break;
-        // Add more error handling here if needed
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -1250,7 +1234,7 @@ if (isset($_GET['error'])) {
     <!-- Video Hero Section -->
     <section class="video-hero" id="home">
         <video class="video-background" autoplay muted loop>
-            <source src="hero video.mp4" type="video/mp4">
+              <source src="hero-video.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
         <div class="video-overlay"></div>
@@ -1265,107 +1249,90 @@ if (isset($_GET['error'])) {
     </section>
 
    <!-- Devotion Content -->
-    <section class="section" id="devotion">
+   <section class="section" id="devotion">
         <div class="container">
-            <?php if ($message): ?>
-                <div class="alert-message"><?= htmlspecialchars($message) ?></div>
-            <?php endif; ?>
-
+            <div class="devotion-section-header">
+                <h2 class="section-title" style="text-align: center; margin-bottom: 50px; color: var(--primary); font-family: var(--font-heading);">Today's Featured Devotional</h2>
+            </div>
             <div class="devotion-page">
-
-                <!-- Main Devotion Content -->
                 <div class="devotion-main">
-
-                    <!-- Devotion Cover -->
                     <div class="devotion-cover">
-                        <?php if ($devotion && isset($devotion['image_path'], $devotion['topic'], $devotion['date'])): ?>
-                            <img src="<?= htmlspecialchars($devotion['image_path']) ?>" alt="Today's Devotion"
-                                class="cover-image" />
-                            <div class="cover-content">
-                                <h2 class="cover-topic"><?= htmlspecialchars($devotion['topic']) ?></h2>
-                                <p class="cover-date">
-                                    <span>The Anchor - <?= date("F j, Y", strtotime($devotion['date'])) ?></span>
-                                </p>
-                                <!-- <a href="download/devotionals.pdf" class="download-btn" download>
-                                    <i class="fas fa-download"></i> Download PDF
-                                </a> -->
-                            </div>
-                        <?php else: ?>
-                            <div class="cover-content">
-                                <h2 class="cover-topic">No devotion available</h2>
-                                <p class="cover-date">
-                                    <span>The Anchor - <?= date("F j, Y") ?></span>
-                                </p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                    <img src="<?= htmlspecialchars($landing['cover_image'] ?? 'assets/default-cover.jpg') ?>" 
+                         alt="Devotional Cover" class="cover-image">
 
-                    <!-- Devotion Text Content -->
-                    <div class="devotion-content">
-                        <?php if ($devotions): ?>
-                            <h3 class="devotion-title"><?= htmlspecialchars($devotions['title']) ?></h3>
-                            <p class="devotion-verse"><?= nl2br(htmlspecialchars($devotions['verse'])) ?></p>
-
-                            <div class="devotion-text">
-                                <?= $devotions['content'] ?>
-                            </div>
-                        <?php else: ?>
-                            <p>No devotion found for today.</p>
-                        <?php endif; ?>
-                    </div>
-
-                   
-
-                    <!-- See More Devotions Button -->
-                    <div class="see-more-devotions">
-                        <a href="devotions.php" class="btn btn-primary">
-                            <i class="fas fa-book-open"></i> See More Devotions
-                        </a>
+                    <div class="cover-content">
+                        <h2 class="cover-topic">
+                            <?= htmlspecialchars($landing['featured_topic'] ?? 'No Topic') ?>
+                        </h2>
+                        <h4 class="cover-subtitle">
+                            <?= htmlspecialchars($landing['hero_subtitle'] ?? '') ?>
+                        </h4>
+                        <p class="cover-date">
+                            The Anchor - <?= !empty($landing['featured_date']) ? date("F j, Y", strtotime($landing['featured_date'])) : date("F j, Y") ?>
+                        </p>
                     </div>
                 </div>
 
-                <!-- Author Info Sidebar -->
-                <aside class="author-column">
+                    <div class="devotion-content">
+                        <h3 class="devotion-title">
+                        <?= htmlspecialchars($landing['featured_topic'] ?? 'No Title Available') ?>
+                        </h3>
+                          <div class="devotion-text">
+                        <p><?= nl2br(htmlspecialchars($landing['hero_description'] ?? 'No description available.')) ?></p>
+                        <p><em><?= nl2br(htmlspecialchars($landing['featured_intro'] ?? '')) ?></em></p>
+                    </div>
+                        
+                        <div class="devotion-actions">
+                            <a href="past-devotions.html" class="btn btn-primary">
+                                <i class="fas fa-book-open"></i> See More Devotions
+                            </a>
+                            <div class="social-share">
+                                <span>Share this devotion:</span>
+                                <a href="https://www.facebook.com/sharer/sharer.php?u=https://theanchordevotional.com" target="_blank" rel="noopener"><i class="fab fa-facebook-f"></i></a>
+                                <a href="https://twitter.com/intent/tweet?text=Check%20out%20this%20inspiring%20devotion&url=https://theanchordevotional.com" target="_blank" rel="noopener"><i class="fab fa-twitter"></i></a>
+                                <a href="https://wa.me/?text=Check%20out%20this%20inspiring%20devotion%20from%20The%20Anchor%20Devotional%20https://theanchordevotional.com" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i></a>
+                                <a href="mailto:?subject=Inspiring%20Daily%20Devotion&body=I%20thought%20you%20might%20enjoy%20this%20devotion%20from%20The%20Anchor%20Devotional:%20https://theanchordevotional.com"><i class="fas fa-envelope"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <div class="author-column">
                     <div class="author-header">
-                        <img src="PROFILE DADDY 1.png" alt="Maj Gen (Dr) Ezra Jahadi Jakko (Rtd)"
-                            class="author-avatar" />
+                        <img src="profile-daddy.png" alt="Author" class="author-avatar">
                         <h3 class="author-name">Maj Gen (Dr) Ezra Jahadi Jakko (Rtd)</h3>
-                        <p class="author-title">
-                            Pastor/General Overseer<br />
-                            Gospel Believers Mission
-                        </p>
+                        <p class="author-title">Pastor/General Overseer<br>Gospel Believers mission</p>
                     </div>
-
+                    
                     <div class="author-bio">
-                        <p>Pastor has been writing daily devotionals for years. His insights into Scripture have helped
-                            thousands grow in their faith journey.</p>
+                        <p>Pastor has been writing daily devotionals for years. His insights into Scripture have helped thousands grow in their faith journey.</p>
                     </div>
-
+                    
                     <div class="author-contact">
                         <div class="contact-item">
                             <i class="fas fa-envelope"></i>
-                            <span>pastor@theanchor.com</span>
+                            <a href="mailto:pastor@theanchor.com">pastor@theanchor.com</a>
                         </div>
                         <div class="contact-item">
                             <i class="fas fa-phone"></i>
-                            <span>+234 812 345 6789</span>
+                            <a href="tel:+2348123456789">+234 812 345 6789</a>
                         </div>
                         <div class="contact-item">
                             <i class="fas fa-map-marker-alt"></i>
                             <span>Abuja, Nigeria</span>
                         </div>
                     </div>
-
+                    
                     <div class="author-social">
-                        <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-                        <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-                        <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                        <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
                     </div>
-                </aside>
-
-            </div> <!-- end devotion-page -->
-        </div> <!-- end container -->
+                </div>
+            </div>
+        </div>
     </section>
 
 
@@ -1376,11 +1343,15 @@ if (isset($_GET['error'])) {
             <div class="verse-card">
                 <div class="verse-header">
                     <h3>Verse of the Day</h3>
-                    <span class="verse-date" id="verse-date"><?php echo htmlspecialchars($today ?? ''); ?></span>
+                    <blockquote>
+                    <?php echo htmlspecialchars($landing['featured_date']); ?>
+
+                    </blockquote>
                 </div>
                 <div class="verse-text">
-                    <cite id="verse-reference"><?php echo htmlspecialchars($verseRef ?? ''); ?></cite>
-                    <p id="daily-verse-text"><?php echo htmlspecialchars($verseText ?? ''); ?></p>
+                    <?php echo htmlspecialchars($landing['verse_of_day']); ?><br>
+
+                    <cite><?php echo htmlspecialchars($landing['verse_reference']); ?></cite>
                 </div>
                 <div class="verse-actions">
                     <button class="btn-share-verse" onclick="shareVerse()">
