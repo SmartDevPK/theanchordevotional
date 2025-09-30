@@ -1,7 +1,14 @@
 <?php
 // subscribers.php
-
 session_start();
+
+// Check if the user is logged in
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+    // Redirect to login page if not logged in
+    header("Location: login.php");
+    exit();
+}
+
 error_reporting(E_ALL);
 ini_set("display_errors", 1);
 
@@ -260,6 +267,9 @@ $conn->close();
         </div>
         <?php endif; ?>
     </div>
+     <a href="dashboard.php" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
 
     <footer class="bg-dark text-light text-center py-3 mt-5">
         <div class="container">

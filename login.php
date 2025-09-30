@@ -10,7 +10,7 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $validEmail = "emmanuelmichaelpk3@gmail.com";
-    $validPassword = "Pk123456789@";
+    $validPassword = "12345678";
 
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';

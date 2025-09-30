@@ -1,8 +1,9 @@
 <?php
 // Enable error reporting
+ob_start();
 error_reporting(E_ALL);
-ini_set("display_errors", 1);
-
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 // Database connection settings
 $host = "localhost";
 $port = 3307;
@@ -10,13 +11,16 @@ $username = "root";
 $password = "";
 $database = "prayer_db";
 
+// Today date
+$today = date("Y-m-d");
+
 // Initialize variables
 $devotions = [];
 $month = isset($_GET['month']) ? intval($_GET['month']) : '';
 $year = isset($_GET['year']) ? intval($_GET['year']) : '';
 
 // Pagination settings
-$per_page = 6; // Number of items per page
+$per_page = 6;
 $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($current_page - 1) * $per_page;
 
@@ -31,31 +35,24 @@ try {
         throw new Exception("Connection failed: {$conn->connect_error}");
     }
 
-    // Build the base query for counting total records
-    $count_sql = "SELECT COUNT(*) as total FROM devotions WHERE 1";
-    // Build the base query for fetching data
-    $sql = "SELECT id, title, excerpt, devotion_date, image FROM devotions WHERE 1";
+    // Count past devotions (exclude today & future)
+    $count_sql = "SELECT COUNT(*) as total FROM devotions WHERE DATE(devotion_date) < '$today'";
+    if (!empty($month)) $count_sql .= " AND MONTH(devotion_date) = $month";
+    if (!empty($year)) $count_sql .= " AND YEAR(devotion_date) = $year";
 
-    if (!empty($month)) {
-        $count_sql .= " AND MONTH(devotion_date) = $month";
-        $sql .= " AND MONTH(devotion_date) = $month";
-    }
-
-    if (!empty($year)) {
-        $count_sql .= " AND YEAR(devotion_date) = $year";
-        $sql .= " AND YEAR(devotion_date) = $year";
-    }
-
-    $sql .= " ORDER BY devotion_date DESC LIMIT $offset, $per_page";
-
-    // Get total count for pagination
     $count_result = $conn->query($count_sql);
     $total_rows = $count_result->fetch_assoc()['total'];
     $total_pages = ceil($total_rows / $per_page);
 
-    // Execute query for data
-    $result = $conn->query($sql);
+    // Fetch past devotions
+    $sql = "SELECT id, topic, devotion_date, devotion_image, devotion_intro, devotion_verse, verse_reference
+            FROM devotions 
+            WHERE DATE(devotion_date) < '$today'";
+    if (!empty($month)) $sql .= " AND MONTH(devotion_date) = $month";
+    if (!empty($year)) $sql .= " AND YEAR(devotion_date) = $year";
+    $sql .= " ORDER BY devotion_date DESC LIMIT $offset, $per_page";
 
+    $result = $conn->query($sql);
     if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
             $devotions[] = $row;
@@ -64,62 +61,12 @@ try {
 
 } catch (Exception $e) {
     error_log("Database error: " . $e->getMessage());
-    // You might want to show a user-friendly message
 } finally {
-    if (isset($conn)) {
-        $conn->close();
-    }
-}
-
-// If this is an AJAX request, return just the results HTML
-if ($is_ajax) {
-    ob_start(); // Start output buffering
-    ?>
-    <div class="devotions-grid">
-        <?php if (!empty($devotions)): ?>
-            <?php foreach ($devotions as $devotion): ?>
-                <div class="devotion-card">
-                    <img src="<?= htmlspecialchars($devotion['image'] ?? 'default-devotion.jpg') ?>"
-                        alt="<?= htmlspecialchars($devotion['title']) ?>" class="devotion-image">
-                    <div class="devotion-content">
-                        <div class="devotion-date">
-                            <?= date('F j, Y', strtotime($devotion['devotion_date'])) ?>
-                        </div>
-                        <h3 class="devotion-title"><?= htmlspecialchars($devotion['title']) ?></h3>
-                        <p class="devotion-excerpt"><?= htmlspecialchars($devotion['excerpt']) ?></p>
-                        <a href="past-devotion.php?id=<?= $devotion['id'] ?>" class="read-more">
-                            Read More <i class="fas fa-arrow-right"></i>
-                        </a>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <p>No devotions found for the selected filter.</p>
-        <?php endif; ?>
-    </div>
-
-    <div class="pagination">
-        <?php if ($current_page > 1): ?>
-            <a href="?page=<?= $current_page - 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                class="page-link"><i class="fas fa-chevron-left"></i></a>
-        <?php endif; ?>
-
-        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-            <a href="?page=<?= $i ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                class="page-link <?= $i == $current_page ? 'active' : '' ?>"><?= $i ?></a>
-        <?php endfor; ?>
-
-        <?php if ($current_page < $total_pages): ?>
-            <a href="?page=<?= $current_page + 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                class="page-link"><i class="fas fa-chevron-right"></i></a>
-        <?php endif; ?>
-    </div>
-    <?php
-    $html = ob_get_clean(); // Get the buffered output
-    echo $html;
-    exit; // Stop further execution for AJAX requests
+    if (isset($conn)) $conn->close();
 }
 ?>
+
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -411,90 +358,104 @@ if ($is_ajax) {
         </div>
     </header>
 
-    <main>
-        <div class="container">
-            <h1 class="page-title">Past Devotions</h1>
+<main>
+    <div class="container">
+        <h1 class="page-title">Past Devotions</h1>
 
-            <div class="filter-section">
-                <h2 class="filter-title">Filter Devotions</h2>
-                <form class="filter-form" id="filterForm">
-                    <div class="form-group">
-                        <label for="month">Month</label>
-                        <select id="month" name="month" class="form-control">
-                            <option value="">All Months</option>
-                            <?php
-                            for ($m = 1; $m <= 12; $m++) {
-                                $selected = ($month == $m) ? 'selected' : '';
-                                $monthName = date("F", mktime(0, 0, 0, $m, 1));
-                                echo "<option value=\"$m\" $selected>$monthName</option>";
-                            }
-                            ?>
-                        </select>
-                    </div>
+        <div class="filter-section">
+            <h2 class="filter-title">Filter Devotions</h2>
+            <form class="filter-form" id="filterForm">
+                <div class="form-group">
+                    <label for="month">Month</label>
+                    <select id="month" name="month" class="form-control">
+                        <option value="">All Months</option>
+                        <?php
+                        for ($m = 1; $m <= 12; $m++) {
+                            $selected = ($month == $m) ? 'selected' : '';
+                            $monthName = date("F", mktime(0, 0, 0, $m, 1));
+                            echo "<option value=\"$m\" $selected>$monthName</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
 
-                    <div class="form-group">
-                        <label for="year">Year</label>
-                        <select id="year" name="year" class="form-control">
-                            <option value="">All Years</option>
-                            <?php
-                            for ($y = 2025; $y <= 2050; $y++) {
-                                $selected = ($year == $y) ? 'selected' : '';
-                                echo "<option value=\"$y\" $selected>$y</option>";
-                            }
-                            ?>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <select id="year" name="year" class="form-control">
+                        <option value="">All Years</option>
+                        <?php
+                        for ($y = 2025; $y <= 2050; $y++) {
+                            $selected = ($year == $y) ? 'selected' : '';
+                            echo "<option value=\"$y\" $selected>$y</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
 
-                    <div class="form-group">
-                        <button type="submit" class="btn btn-primary">Filter Devotions</button>
-                    </div>
-                </form>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Filter Devotions</button>
+                </div>
+            </form>
 
-                <!-- Where the filtered devotion results will appear -->
-                <div id="devotion-results">
-                    <div class="devotions-grid">
-                        <?php if (!empty($devotions)): ?>
-                            <?php foreach ($devotions as $devotion): ?>
-                                <div class="devotion-card">
-                                    <img src="<?= htmlspecialchars($devotion['image'] ?? 'default-devotion.jpg') ?>"
-                                        alt="<?= htmlspecialchars($devotion['title']) ?>" class="devotion-image">
-                                    <div class="devotion-content">
-                                        <div class="devotion-date">
-                                            <?= date('F j, Y', strtotime($devotion['devotion_date'])) ?>
-                                        </div>
-                                        <h3 class="devotion-title"><?= htmlspecialchars($devotion['title']) ?></h3>
-                                        <p class="devotion-excerpt"><?= htmlspecialchars($devotion['excerpt']) ?></p>
-                                        <a href="past-devotion.php?id=<?= $devotion['id'] ?>" class="read-more">
-                                            Read More <i class="fas fa-arrow-right"></i>
-                                        </a>
+            <!-- Devotion results -->
+            <div id="devotion-results">
+                <div class="devotions-grid">
+                    <?php if (!empty($devotions)): ?>
+                        <?php foreach ($devotions as $devotion): ?>
+                            <div class="devotion-card">
+                                <img src="<?= htmlspecialchars($devotion['devotion_image'] ?? 'default-devotion.jpg') ?>"
+                                    alt="<?= htmlspecialchars($devotion['topic']) ?>" class="devotion-image">
+
+                                <div class="devotion-content">
+                                    <div class="devotion-date">
+                                        <?= date('F j, Y', strtotime($devotion['devotion_date'])) ?>
                                     </div>
+
+                                    <h3 class="devotion-title"><?= htmlspecialchars($devotion['topic']) ?></h3>
+
+                                    <p class="devotion-verse">
+                                        <strong><?= htmlspecialchars($devotion['devotion_verse']) ?></strong>
+                                        <br>
+                                        <small><em><?= htmlspecialchars($devotion['verse_reference']) ?></em></small>
+                                    </p>
+
+                                    <p class="devotion-intro">
+                                        <?= nl2br(htmlspecialchars($devotion['devotion_intro'])) ?>
+                                    </p>
+
+                                    <a href="past-devotion.php?id=<?= $devotion['id'] ?>" class="read-more">
+                                        Read More <i class="fas fa-arrow-right"></i>
+                                    </a>
                                 </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p>No devotions found. Please check back later.</p>
-                        <?php endif; ?>
-                    </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p>No devotions found. Please check back later.</p>
+                    <?php endif; ?>
+                </div>
 
-                    <div class="pagination">
-                        <?php if ($current_page > 1): ?>
-                            <a href="?page=<?= $current_page - 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                                class="page-link"><i class="fas fa-chevron-left"></i></a>
-                        <?php endif; ?>
+                <!-- Pagination -->
+                <div class="pagination">
+                    <?php if ($current_page > 1): ?>
+                        <a href="?page=<?= $current_page - 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
+                            class="page-link"><i class="fas fa-chevron-left"></i></a>
+                    <?php endif; ?>
 
-                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                            <a href="?page=<?= $i ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                                class="page-link <?= $i == $current_page ? 'active' : '' ?>"><?= $i ?></a>
-                        <?php endfor; ?>
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <a href="?page=<?= $i ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
+                            class="page-link <?= $i == $current_page ? 'active' : '' ?>"><?= $i ?></a>
+                    <?php endfor; ?>
 
-                        <?php if ($current_page < $total_pages): ?>
-                            <a href="?page=<?= $current_page + 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
-                                class="page-link"><i class="fas fa-chevron-right"></i></a>
-                        <?php endif; ?>
-                    </div>
+                    <?php if ($current_page < $total_pages): ?>
+                        <a href="?page=<?= $current_page + 1 ?><?= !empty($month) ? "&month=$month" : '' ?><?= !empty($year) ? "&year=$year" : '' ?>"
+                            class="page-link"><i class="fas fa-chevron-right"></i></a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
-    </main>
+    </div>
+</main>
+
 
     <footer>
         <div class="container">

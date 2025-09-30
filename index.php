@@ -1283,7 +1283,7 @@ $conn->close();
                     </div>
                         
                         <div class="devotion-actions">
-                            <a href="past-devotions.html" class="btn btn-primary">
+                            <a href="past-devotions.php" class="btn btn-primary">
                                 <i class="fas fa-book-open"></i> See More Devotions
                             </a>
                             <div class="social-share">
